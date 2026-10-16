@@ -57,6 +57,17 @@ export function assertPending(request: Pick<VacationRequest, "status">, action: 
 	}
 }
 
+/**
+ * Rule 4, when deciding: a request that waited in Pending until its start
+ * date passed cannot be approved, as that would approve days in the past.
+ * It can still be rejected, or moved to new dates by the requester.
+ */
+export function assertNotStarted(request: Pick<VacationRequest, "startDate">, today: string): void {
+	if (request.startDate < today) {
+		throw new ConflictError("Cannot approve a request whose start date has passed; reject it instead");
+	}
+}
+
 /** Rule 5: a rejected request must contain a rejection comment. Returns it trimmed. */
 export function requireRejectionComment(comment: string | undefined | null): string {
 	const trimmed = comment?.trim() ?? "";

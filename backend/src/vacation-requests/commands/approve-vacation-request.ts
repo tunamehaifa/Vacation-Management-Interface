@@ -5,10 +5,10 @@ import { UserRole } from "../../entities/user.entity";
 import { VacationRequestStatus } from "../../entities/vacation-request.entity";
 import { VacationRequestApprovedEvent } from "../events";
 import { loadForUpdate } from "../repository";
-import { assertPending } from "../rules";
+import { assertNotStarted, assertPending, todayUtc } from "../rules";
 import { toView, VacationRequestView } from "../view";
 
-/** A validator approves a Pending request (rule 6: validators only). */
+/** A validator approves a Pending request that has not started yet (rules 4 and 6). */
 export class ApproveVacationRequestCommand extends Command<VacationRequestView> {
 	static readonly access: Access = [UserRole.Validator];
 
@@ -27,6 +27,7 @@ export class ApproveVacationRequestHandler implements CommandHandler<ApproveVaca
 		const view = await dataSource.transaction(async (manager) => {
 			const request = await loadForUpdate(manager, command.requestId);
 			assertPending(request, "approve");
+			assertNotStarted(request, todayUtc());
 
 			request.status = VacationRequestStatus.Approved;
 			return toView(await manager.save(request));

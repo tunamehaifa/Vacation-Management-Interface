@@ -4,11 +4,12 @@ import { useRoute, useRouter, type LocationQueryRaw } from 'vue-router'
 import { errorMessage } from '@/api/http'
 import { usersApi, type UserSummary } from '@/api/users'
 import {
+  isOverdue,
   vacationRequestsApi,
   type VacationRequest,
   type VacationRequestStatus,
 } from '@/api/vacationRequests'
-import { daysInclusive, formatDate } from '@/utils/dates'
+import { daysInclusive, formatDate, todayIso } from '@/utils/dates'
 import AlertMessage from '@/components/AlertMessage.vue'
 import BaseButton from '@/components/BaseButton.vue'
 import PaginationBar from '@/components/PaginationBar.vue'
@@ -182,6 +183,7 @@ onBeforeUnmount(() => clearTimeout(noticeTimer))
 const period = (request: VacationRequest) =>
   `${formatDate(request.startDate)} – ${formatDate(request.endDate)}`
 const days = (request: VacationRequest) => daysInclusive(request.startDate, request.endDate)
+const overdue = (request: VacationRequest) => isOverdue(request, todayIso())
 
 const emptyText = computed(() =>
   status.value === 'Pending' && !userId.value
@@ -251,8 +253,11 @@ const tabClass = (value: StatusFilter) =>
             <p v-if="request.comments" class="text-sm break-words text-gray-600">
               <span class="font-medium">Comment:</span> {{ request.comments }}
             </p>
+            <p v-if="overdue(request)" class="text-sm text-amber-700">Start date has passed: it can only be rejected.</p>
             <div v-if="request.status === 'Pending'" class="flex gap-2 pt-1">
-              <BaseButton class="flex-1" @click="review(request, 'approve')">Approve</BaseButton>
+              <BaseButton class="flex-1" :disabled="overdue(request)" @click="review(request, 'approve')">
+                Approve
+              </BaseButton>
               <BaseButton class="flex-1" variant="secondary" @click="review(request, 'reject')">Reject</BaseButton>
             </div>
           </li>
@@ -280,10 +285,13 @@ const tabClass = (value: StatusFilter) =>
                 <td class="max-w-xs px-4 py-3">
                   <StatusBadge :status="request.status" />
                   <p v-if="request.comments" class="mt-1 break-words text-gray-600">{{ request.comments }}</p>
+                  <p v-if="overdue(request)" class="mt-1 text-xs text-amber-700">
+                    Start date has passed: it can only be rejected.
+                  </p>
                 </td>
                 <td class="px-4 py-3">
                   <div v-if="request.status === 'Pending'" class="flex justify-end gap-2">
-                    <BaseButton @click="review(request, 'approve')">Approve</BaseButton>
+                    <BaseButton :disabled="overdue(request)" @click="review(request, 'approve')">Approve</BaseButton>
                     <BaseButton variant="secondary" @click="review(request, 'reject')">Reject</BaseButton>
                   </div>
                 </td>

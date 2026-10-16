@@ -17,6 +17,14 @@ export interface VacationRequest {
   updatedAt: string
 }
 
+/**
+ * A Pending request whose start date has passed can no longer be approved,
+ * only rejected (rule 4; the API refuses it too). Today is the user's date here
+ * and the server's UTC date in the API, so they can differ near midnight.
+ */
+export const isOverdue = (request: VacationRequest, today: string) =>
+  request.status === 'Pending' && request.startDate < today
+
 /** What the requester fills in, for both creating and editing. */
 export interface VacationPeriod {
   startDate: string

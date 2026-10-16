@@ -3,6 +3,7 @@ import { VacationRequestStatus } from "../../src/entities/vacation-request.entit
 import { ConflictError, ValidationError } from "../../src/http/errors";
 import {
 	assertNoOverlap,
+	assertNotStarted,
 	assertPending,
 	assertValidPeriod,
 	requireRejectionComment,
@@ -32,6 +33,14 @@ describe("rule 4: no requests in the past", () => {
 
 	it("rejects a vacation that started yesterday", () => {
 		expect(() => assertValidPeriod("2026-10-15", "2026-10-20", TODAY)).toThrow(/cannot start in the past/);
+	});
+
+	it("a Pending request can be approved up to its start day", () => {
+		expect(() => assertNotStarted({ startDate: TODAY }, TODAY)).not.toThrow();
+	});
+
+	it("a Pending request whose start date has passed cannot be approved", () => {
+		expect(() => assertNotStarted({ startDate: "2026-10-15" }, TODAY)).toThrow(ConflictError);
 	});
 
 	it("today is the UTC calendar day", () => {

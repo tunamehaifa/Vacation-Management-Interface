@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { errorMessage, fieldErrors } from '@/api/http'
-import { vacationRequestsApi, type VacationRequest } from '@/api/vacationRequests'
-import { daysInclusive, formatDate } from '@/utils/dates'
+import { isOverdue, vacationRequestsApi, type VacationRequest } from '@/api/vacationRequests'
+import { daysInclusive, formatDate, todayIso } from '@/utils/dates'
 import AlertMessage from './AlertMessage.vue'
 import BaseButton from './BaseButton.vue'
 import BaseDialog from './BaseDialog.vue'
@@ -51,6 +51,8 @@ function back() {
   if (props.mode === 'view' && current.value !== 'view') current.value = 'view'
   else open.value = false
 }
+
+const overdue = computed(() => !!props.request && isOverdue(props.request, todayIso()))
 
 const who = (request: VacationRequest) => request.user?.name ?? 'the employee'
 
@@ -113,6 +115,9 @@ async function decide() {
         />
       </form>
 
+      <AlertMessage v-if="overdue && current === 'view'" variant="info" class="mt-4">
+        The start date has passed, so this request can no longer be approved, only rejected.
+      </AlertMessage>
       <AlertMessage v-if="error" class="mt-4">{{ error }}</AlertMessage>
 
       <div class="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
@@ -120,7 +125,7 @@ async function decide() {
           <BaseButton variant="secondary" @click="open = false">Close</BaseButton>
           <template v-if="request.status === 'Pending'">
             <BaseButton variant="danger" @click="current = 'reject'">Reject…</BaseButton>
-            <BaseButton @click="current = 'approve'">Approve…</BaseButton>
+            <BaseButton :disabled="overdue" @click="current = 'approve'">Approve…</BaseButton>
           </template>
         </template>
         <template v-else>
