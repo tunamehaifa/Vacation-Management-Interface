@@ -171,7 +171,7 @@ paths:
         - { in: query, name: from, schema: { type: string, format: date }, description: Defaults to today }
         - { in: query, name: to, schema: { type: string, format: date }, description: Defaults to from + 90 days }
       responses:
-        '200': { description: "{ from, to, items }" }
+        '200': { description: "{ from, to, items } — reasons only for validators and for the viewer's own vacations" }
 
   /users:
     get:

@@ -31,8 +31,8 @@ export const parseTeamInput: InputParserFn = (event) => {
 	return { from, to };
 };
 
-export const getTeamVacations = authorize(ANY_ROLE, async (input: { from: string; to: string }) => ({
+export const getTeamVacations = authorize(ANY_ROLE, async (input: { from: string; to: string }, _event, user) => ({
 	from: input.from,
 	to: input.to,
-	items: await listTeamVacations(input.from, input.to),
+	items: await listTeamVacations(input.from, input.to, user),
 }));

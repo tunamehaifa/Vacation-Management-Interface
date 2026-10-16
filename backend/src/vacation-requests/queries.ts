@@ -1,3 +1,4 @@
+import type { AuthUser } from "../auth/jwt";
 import { getDataSource } from "../database/data-source";
 import { User, UserRole } from "../entities/user.entity";
 import { VacationRequest, VacationRequestStatus } from "../entities/vacation-request.entity";
@@ -38,8 +39,11 @@ export async function listAllRequests(filters: RequestFilters): Promise<Vacation
 /**
  * Team planning (both roles): everyone's Approved and Pending vacations that
  * touch the [from, to] window, in date order. Rejected ones are not plans.
+ *
+ * A reason can be personal, so it is shared only with validators and with
+ * the person it belongs to; other requesters see who is away when, not why.
  */
-export async function listTeamVacations(from: string, to: string): Promise<VacationRequestView[]> {
+export async function listTeamVacations(from: string, to: string, viewer: AuthUser): Promise<VacationRequestView[]> {
 	const requests = await (await getDataSource())
 		.getRepository(VacationRequest)
 		.createQueryBuilder("request")
@@ -51,7 +55,10 @@ export async function listTeamVacations(from: string, to: string): Promise<Vacat
 		.orderBy("request.startDate", "ASC")
 		.addOrderBy("user.name", "ASC")
 		.getMany();
-	return requests.map(toView);
+
+	const seesReasons = (request: VacationRequest) =>
+		viewer.role === UserRole.Validator || request.userId === viewer.id;
+	return requests.map((request) => ({ ...toView(request), reason: seesReasons(request) ? request.reason : null }));
 }
 
 /** For the validator's "filter by user" list. */

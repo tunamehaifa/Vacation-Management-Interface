@@ -9,6 +9,8 @@
 - **Only Pending requests can change.** The requester can edit or cancel a Pending request;
   once approved or rejected, it is final (409). Cancelling deletes the row, since the
   assignment defines only three statuses.
+- **Team planning is a monthly timeline** (both roles): who is away when, Approved and Pending.
+  A reason can be personal, so only validators and the owner see it; colleagues see just the dates.
 - **PostgreSQL enums** for `user_role` and `vacation_request_status`. A string field would
   accept any value, and separate tables would be overengineering for a few fixed values.
 - **Rules also enforced by the database**: date order, a comment on rejection, and no
