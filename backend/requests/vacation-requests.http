@@ -1,0 +1,159 @@
+# Vacation requests — for the VS Code "REST Client" extension (humao.rest-client).
+# Start the API (`npm run dev` in backend/), then send the two logins first.
+# Dates are relative to today ({{$datetime "YYYY-MM-DD" 30 d}} = today + 30 days),
+# so the file never goes stale. Run it top to bottom; sending "create" twice hits the overlap
+# rule (409), which is expected — cancel it or pick other dates.
+
+@baseUrl = http://localhost:8888
+@password = Password123!
+@requesterToken = {{loginRequester.response.body.token}}
+@validatorToken = {{loginValidator.response.body.token}}
+@requestId = {{createRequest.response.body.id}}
+
+### Login as a requester (Alice)
+# @name loginRequester
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{ "email": "alice@example.com", "password": "{{password}}" }
+
+### Login as the validator
+# @name loginValidator
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{ "email": "validator@example.com", "password": "{{password}}" }
+
+
+### ================= Requester =================
+
+### Submit a request (201, Pending) — the requests below act on it
+# @name createRequest
+POST {{baseUrl}}/vacation-requests
+Content-Type: application/json
+Authorization: Bearer {{requesterToken}}
+
+{
+  "startDate": "{{$datetime "YYYY-MM-DD" 120 d}}",
+  "endDate": "{{$datetime "YYYY-MM-DD" 125 d}}",
+  "reason": "Ski trip"
+}
+
+### My requests
+GET {{baseUrl}}/vacation-requests/mine
+Authorization: Bearer {{requesterToken}}
+
+### Change dates/reason of my Pending request
+PUT {{baseUrl}}/vacation-requests/{{requestId}}
+Content-Type: application/json
+Authorization: Bearer {{requesterToken}}
+
+{
+  "startDate": "{{$datetime "YYYY-MM-DD" 121 d}}",
+  "endDate": "{{$datetime "YYYY-MM-DD" 126 d}}",
+  "reason": "Ski trip, one day later"
+}
+
+### Create a throwaway request, to cancel it below
+# @name createToCancel
+POST {{baseUrl}}/vacation-requests
+Content-Type: application/json
+Authorization: Bearer {{requesterToken}}
+
+{ "startDate": "{{$datetime "YYYY-MM-DD" 250 d}}", "endDate": "{{$datetime "YYYY-MM-DD" 252 d}}" }
+
+### Cancel it (204) — only Pending requests can be cancelled
+DELETE {{baseUrl}}/vacation-requests/{{createToCancel.response.body.id}}
+Authorization: Bearer {{requesterToken}}
+
+
+### A second request, for the validator to reject
+# @name createToReject
+POST {{baseUrl}}/vacation-requests
+Content-Type: application/json
+Authorization: Bearer {{requesterToken}}
+
+{ "startDate": "{{$datetime "YYYY-MM-DD" 160 d}}", "endDate": "{{$datetime "YYYY-MM-DD" 163 d}}" }
+
+
+### ================= Validator =================
+
+### All requests
+GET {{baseUrl}}/vacation-requests
+Authorization: Bearer {{validatorToken}}
+
+### Filter by status
+GET {{baseUrl}}/vacation-requests?status=Pending
+Authorization: Bearer {{validatorToken}}
+
+### Filter by user (Alice)
+GET {{baseUrl}}/vacation-requests?userId={{loginRequester.response.body.user.id}}
+Authorization: Bearer {{validatorToken}}
+
+### Requesters, for the "filter by user" list
+GET {{baseUrl}}/users?role=Requester
+Authorization: Bearer {{validatorToken}}
+
+### Approve the first request
+POST {{baseUrl}}/vacation-requests/{{requestId}}/approve
+Authorization: Bearer {{validatorToken}}
+
+### Reject the second one — a comment is required
+POST {{baseUrl}}/vacation-requests/{{createToReject.response.body.id}}/reject
+Content-Type: application/json
+Authorization: Bearer {{validatorToken}}
+
+{ "comment": "Release week, please pick other dates." }
+
+
+### ================= Both roles =================
+
+### Team planning: Approved + Pending vacations, next 90 days by default
+GET {{baseUrl}}/team/vacations
+Authorization: Bearer {{requesterToken}}
+
+### Team planning for a chosen window
+GET {{baseUrl}}/team/vacations?from={{$datetime "YYYY-MM-DD"}}&to={{$datetime "YYYY-MM-DD" 180 d}}
+Authorization: Bearer {{validatorToken}}
+
+
+### ================= Business rules (expected errors) =================
+
+### Rule 1 — 400: end date must be after start date
+POST {{baseUrl}}/vacation-requests
+Content-Type: application/json
+Authorization: Bearer {{requesterToken}}
+
+{ "startDate": "{{$datetime "YYYY-MM-DD" 300 d}}", "endDate": "{{$datetime "YYYY-MM-DD" 300 d}}" }
+
+### Rule 2 — 409: overlaps the request created above
+POST {{baseUrl}}/vacation-requests
+Content-Type: application/json
+Authorization: Bearer {{requesterToken}}
+
+{ "startDate": "{{$datetime "YYYY-MM-DD" 123 d}}", "endDate": "{{$datetime "YYYY-MM-DD" 130 d}}" }
+
+### Rule 3 — 409 after the request was approved or rejected: it can no longer be changed
+PUT {{baseUrl}}/vacation-requests/{{requestId}}
+Content-Type: application/json
+Authorization: Bearer {{requesterToken}}
+
+{ "startDate": "{{$datetime "YYYY-MM-DD" 121 d}}", "endDate": "{{$datetime "YYYY-MM-DD" 127 d}}" }
+
+### Rule 4 — 400: cannot start in the past
+POST {{baseUrl}}/vacation-requests
+Content-Type: application/json
+Authorization: Bearer {{requesterToken}}
+
+{ "startDate": "{{$datetime "YYYY-MM-DD" -3 d}}", "endDate": "{{$datetime "YYYY-MM-DD" 2 d}}" }
+
+### Rule 5 — 400: rejecting needs a comment
+POST {{baseUrl}}/vacation-requests/{{requestId}}/reject
+Content-Type: application/json
+Authorization: Bearer {{validatorToken}}
+
+{ "comment": "" }
+
+### Rule 6 — 403: a requester cannot approve
+POST {{baseUrl}}/vacation-requests/{{requestId}}/approve
+Authorization: Bearer {{requesterToken}}

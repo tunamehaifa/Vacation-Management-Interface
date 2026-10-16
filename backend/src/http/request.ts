@@ -31,3 +31,24 @@ export const validate = <T extends z.ZodType>(value: unknown, schema: T): z.infe
 	}
 	return result.data;
 };
+
+/**
+ * Validates the query string against `schema`. CEF's dev server passes the
+ * values still URL-encoded, so they are decoded here; empty values count as absent.
+ */
+export const parseQuery = <T extends z.ZodType>(event: CommonEvent, schema: T): z.infer<T> => {
+	const query: Record<string, string> = {};
+	for (const [key, value] of Object.entries(event.queryStringParameters ?? {})) {
+		if (!value) continue;
+		try {
+			query[key] = decodeURIComponent(value.replace(/\+/g, " "));
+		} catch {
+			throw new ValidationError(`Malformed query parameter: ${key}`);
+		}
+	}
+	return validate(query, schema);
+};
+
+/** The `:id` path parameter, which must be a uuid (else 400, not a database error). */
+export const parseIdParam = (event: CommonEvent): string =>
+	validate(event.pathParameters ?? {}, z.object({ id: z.uuid("Must be a valid id") })).id;

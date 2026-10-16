@@ -4,6 +4,9 @@ import { registerHandlerRefs } from "commoneventframework";
 
 import * as __cef_handlers_auth from "../handlers/auth";
 import * as __cef_handlers_health from "../handlers/health";
+import * as __cef_handlers_team from "../handlers/team";
+import * as __cef_handlers_users from "../handlers/users";
+import * as __cef_handlers_vacation_requests from "../handlers/vacation-requests";
 
 export class HandlerRegistry {
 	static register(): void {
@@ -12,6 +15,22 @@ export class HandlerRegistry {
 			"handlers/auth#login": __cef_handlers_auth.login,
 			"handlers/auth#parseLoginInput": __cef_handlers_auth.parseLoginInput,
 			"handlers/health#getHealth": __cef_handlers_health.getHealth,
+			"handlers/team#getTeamVacations": __cef_handlers_team.getTeamVacations,
+			"handlers/team#parseTeamInput": __cef_handlers_team.parseTeamInput,
+			"handlers/users#getUsers": __cef_handlers_users.getUsers,
+			"handlers/users#parseUsersInput": __cef_handlers_users.parseUsersInput,
+			"handlers/vacation-requests#approveRequest": __cef_handlers_vacation_requests.approveRequest,
+			"handlers/vacation-requests#cancelRequest": __cef_handlers_vacation_requests.cancelRequest,
+			"handlers/vacation-requests#createRequest": __cef_handlers_vacation_requests.createRequest,
+			"handlers/vacation-requests#getAllRequests": __cef_handlers_vacation_requests.getAllRequests,
+			"handlers/vacation-requests#getMyRequests": __cef_handlers_vacation_requests.getMyRequests,
+			"handlers/vacation-requests#parseCreateInput": __cef_handlers_vacation_requests.parseCreateInput,
+			"handlers/vacation-requests#parseFilterInput": __cef_handlers_vacation_requests.parseFilterInput,
+			"handlers/vacation-requests#parseIdInput": __cef_handlers_vacation_requests.parseIdInput,
+			"handlers/vacation-requests#parseRejectInput": __cef_handlers_vacation_requests.parseRejectInput,
+			"handlers/vacation-requests#parseUpdateInput": __cef_handlers_vacation_requests.parseUpdateInput,
+			"handlers/vacation-requests#rejectRequest": __cef_handlers_vacation_requests.rejectRequest,
+			"handlers/vacation-requests#updateRequest": __cef_handlers_vacation_requests.updateRequest,
 		});
 	}
 }

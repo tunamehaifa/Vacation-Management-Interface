@@ -51,3 +51,12 @@ export type CommandMiddleware = (
 	context: ExecutionContext,
 	next: () => Promise<unknown>,
 ) => Promise<unknown>;
+
+/**
+ * The actor of a non-public command. The authorization middleware has already
+ * rejected anonymous callers, so this only narrows the type for the handler.
+ */
+export function actorOf(context: ExecutionContext): AuthUser {
+	if (!context.actor) throw new Error("Command reached its handler without an actor");
+	return context.actor;
+}

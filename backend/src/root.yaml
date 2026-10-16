@@ -57,3 +57,130 @@ paths:
           description: "{ id, name, email, role }"
         '401':
           description: Missing, invalid or expired token
+
+  /vacation-requests:
+    post:
+      x-handler: handlers/vacation-requests#createRequest
+      x-inputParser: handlers/vacation-requests#parseCreateInput
+      summary: Submit a vacation request (Requester)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [startDate, endDate]
+              properties:
+                startDate: { type: string, format: date }
+                endDate: { type: string, format: date }
+                reason: { type: string, nullable: true }
+      responses:
+        '201': { description: The created request (Pending) }
+        '400': { description: Invalid input, end not after start, or start in the past }
+        '403': { description: Not a requester }
+        '409': { description: Overlaps another Pending/Approved request }
+    get:
+      x-handler: handlers/vacation-requests#getAllRequests
+      x-inputParser: handlers/vacation-requests#parseFilterInput
+      summary: All requests, optionally filtered (Validator)
+      security:
+        - bearerAuth: []
+      parameters:
+        - { in: query, name: status, schema: { type: string, enum: [Pending, Approved, Rejected] } }
+        - { in: query, name: userId, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: "{ items }" }
+        '403': { description: Not a validator }
+
+  /vacation-requests/mine:
+    get:
+      x-handler: handlers/vacation-requests#getMyRequests
+      summary: The signed-in requester's own requests
+      security:
+        - bearerAuth: []
+      responses:
+        '200': { description: "{ items }" }
+        '403': { description: Not a requester }
+
+  /vacation-requests/:id:
+    put:
+      x-handler: handlers/vacation-requests#updateRequest
+      x-inputParser: handlers/vacation-requests#parseUpdateInput
+      summary: Change dates/reason of an own Pending request (Requester)
+      security:
+        - bearerAuth: []
+      responses:
+        '200': { description: The updated request }
+        '404': { description: No such request of yours }
+        '409': { description: Already approved/rejected, or overlaps another request }
+    delete:
+      x-handler: handlers/vacation-requests#cancelRequest
+      x-inputParser: handlers/vacation-requests#parseIdInput
+      summary: Cancel an own Pending request (Requester)
+      security:
+        - bearerAuth: []
+      responses:
+        '204': { description: Cancelled }
+        '404': { description: No such request of yours }
+        '409': { description: Already approved/rejected }
+
+  /vacation-requests/:id/approve:
+    post:
+      x-handler: handlers/vacation-requests#approveRequest
+      x-inputParser: handlers/vacation-requests#parseIdInput
+      summary: Approve a Pending request (Validator)
+      security:
+        - bearerAuth: []
+      responses:
+        '200': { description: The approved request }
+        '403': { description: Not a validator }
+        '409': { description: Already approved/rejected }
+
+  /vacation-requests/:id/reject:
+    post:
+      x-handler: handlers/vacation-requests#rejectRequest
+      x-inputParser: handlers/vacation-requests#parseRejectInput
+      summary: Reject a Pending request with a comment (Validator)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [comment]
+              properties:
+                comment: { type: string }
+      responses:
+        '200': { description: The rejected request }
+        '400': { description: Missing comment }
+        '403': { description: Not a validator }
+        '409': { description: Already approved/rejected }
+
+  /team/vacations:
+    get:
+      x-handler: handlers/team#getTeamVacations
+      x-inputParser: handlers/team#parseTeamInput
+      summary: Approved and Pending vacations of everyone in a date window (both roles)
+      security:
+        - bearerAuth: []
+      parameters:
+        - { in: query, name: from, schema: { type: string, format: date }, description: Defaults to today }
+        - { in: query, name: to, schema: { type: string, format: date }, description: Defaults to from + 90 days }
+      responses:
+        '200': { description: "{ from, to, items }" }
+
+  /users:
+    get:
+      x-handler: handlers/users#getUsers
+      x-inputParser: handlers/users#parseUsersInput
+      summary: Users, optionally by role — for the dashboard's user filter (Validator)
+      security:
+        - bearerAuth: []
+      parameters:
+        - { in: query, name: role, schema: { type: string, enum: [Requester, Validator] } }
+      responses:
+        '200': { description: "{ items }" }

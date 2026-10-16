@@ -4,6 +4,11 @@
 
 - **End date strictly after start date.** A one-day vacation would make sense, but I followed
   the description literally (`end_date > start_date`).
+- **A vacation may start today.** "Requests in the past are not allowed" is read as
+  `start_date >= today`; "today" is the server's UTC date.
+- **Only Pending requests can change.** The requester can edit or cancel a Pending request;
+  once approved or rejected, it is final (409). Cancelling deletes the row, since the
+  assignment defines only three statuses.
 - **PostgreSQL enums** for `user_role` and `vacation_request_status`. A string field would
   accept any value, and separate tables would be overengineering for a few fixed values.
 - **Rules also enforced by the database**: date order, a comment on rejection, and no
