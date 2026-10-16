@@ -70,6 +70,24 @@ watch(
 const STRIPES =
   'repeating-linear-gradient(135deg, rgb(251 191 36) 0 6px, rgb(254 243 199) 6px 12px)'
 
+/**
+ * A vacation that runs on past the shown month ends in an arrow point (▶);
+ * one that started before it begins with a notch. The tooltip and the
+ * details panel give the full dates.
+ */
+const ARROW = '10px'
+function barShape(vacation: VacationRequest) {
+  const { continuesBefore, continuesAfter } = barPlacement(vacation)
+  const right = continuesAfter
+    ? [`calc(100% - ${ARROW}) 0`, '100% 50%', `calc(100% - ${ARROW}) 100%`]
+    : ['100% 0', '100% 100%']
+  const left = continuesBefore ? ['0 100%', `${ARROW} 50%`, '0 0'] : ['0 100%', '0 0']
+  return {
+    clipPath: continuesBefore || continuesAfter ? `polygon(${[...right, ...left].join(', ')})` : undefined,
+    rounding: [continuesBefore ? '' : 'rounded-l-md', continuesAfter ? '' : 'rounded-r-md'],
+  }
+}
+
 const label = (vacation: VacationRequest) =>
   `${vacation.user?.name}: ${formatDate(vacation.startDate)} – ${formatDate(vacation.endDate)}, ` +
   `${daysInclusive(vacation.startDate, vacation.endDate)} days, ${vacation.status}`
@@ -124,7 +142,9 @@ const label = (vacation: VacationRequest) =>
           ]"
         />
 
-        <!-- Vacation bars, on top of the background -->
+        <!-- Vacation bars, on top of the background. The button is a plain rectangle
+             (so focus and selection rings are never clipped); the shape inside it
+             gets the colour and, when the vacation runs past the month, the arrow end. -->
         <button
           v-for="vacation in row.vacations"
           :key="vacation.id"
@@ -132,20 +152,25 @@ const label = (vacation: VacationRequest) =>
           :title="label(vacation)"
           :aria-label="label(vacation)"
           :aria-pressed="vacation.id === selectedId"
-          class="z-10 my-2 h-7 min-w-0 cursor-pointer shadow-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-600"
-          :class="[
-            vacation.status === 'Approved' ? 'bg-green-500 hover:bg-green-600' : 'ring-1 ring-amber-400 ring-inset',
-            barPlacement(vacation).continuesBefore ? '' : 'ml-0.5 rounded-l-md',
-            barPlacement(vacation).continuesAfter ? '' : 'mr-0.5 rounded-r-md',
-            vacation.id === selectedId ? 'ring-2 ring-indigo-600 ring-offset-1' : '',
-          ]"
-          :style="{
-            gridRow: 1,
-            gridColumn: barPlacement(vacation).gridColumn,
-            ...(vacation.status === 'Pending' && { background: STRIPES }),
-          }"
+          class="group z-10 mx-0.5 my-2 h-7 min-w-0 cursor-pointer rounded-md focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-600"
+          :class="vacation.id === selectedId ? 'ring-2 ring-indigo-600 ring-offset-1' : ''"
+          :style="{ gridRow: 1, gridColumn: barPlacement(vacation).gridColumn }"
           @click="emit('select', vacation)"
-        />
+        >
+          <span
+            class="block h-full w-full"
+            :class="[
+              vacation.status === 'Approved'
+                ? 'bg-green-500 group-hover:bg-green-600'
+                : 'ring-1 ring-amber-400 ring-inset group-hover:brightness-95',
+              ...barShape(vacation).rounding,
+            ]"
+            :style="{
+              clipPath: barShape(vacation).clipPath,
+              ...(vacation.status === 'Pending' && { background: STRIPES }),
+            }"
+          />
+        </button>
       </div>
 
       <p v-if="rows.length === 0" class="px-4 py-8 text-center text-sm text-gray-500">

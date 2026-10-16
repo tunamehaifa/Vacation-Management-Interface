@@ -86,6 +86,14 @@ function select(vacation: VacationRequest) {
           />
           Pending
         </span>
+        <span class="flex items-center gap-1.5">
+          <span
+            class="h-3 w-5 bg-gray-400"
+            style="clip-path: polygon(0 0, calc(100% - 5px) 0, 100% 50%, calc(100% - 5px) 100%, 0 100%)"
+            aria-hidden="true"
+          />
+          Continues next / previous month
+        </span>
       </div>
     </div>
 
