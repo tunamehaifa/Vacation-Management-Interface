@@ -1,7 +1,8 @@
 import { CommandBus } from "./cqrs/command-bus";
 import { EventBus } from "./cqrs/event-bus";
 import { authorizationMiddleware } from "./cqrs/middleware/authorization";
-import { loggingMiddleware } from "./cqrs/middleware/logging";
+import { commandLoggingMiddleware } from "./cqrs/middleware/command-logging";
+import { eventLoggingMiddleware } from "./cqrs/middleware/event-logging";
 
 /**
  * Composition root: the one place where buses are built, middlewares are
@@ -10,9 +11,9 @@ import { loggingMiddleware } from "./cqrs/middleware/logging";
  *
  * Logging comes first, so refused commands (401/403) are logged too.
  */
-export const eventBus = new EventBus();
+export const eventBus = new EventBus().use(eventLoggingMiddleware);
 
-export const commandBus = new CommandBus().use(loggingMiddleware).use(authorizationMiddleware);
+export const commandBus = new CommandBus().use(commandLoggingMiddleware).use(authorizationMiddleware);
 
 // Command handlers and event subscribers are registered here as features land, e.g.
 //   commandBus.register(ApproveVacationRequestCommand, new ApproveVacationRequestHandler(eventBus));

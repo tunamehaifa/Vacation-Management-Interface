@@ -16,13 +16,14 @@ const pretty = process.argv.includes("--local");
 // Locally, each entry becomes one line built from its fields, e.g.
 //   12:27:48 INFO: http POST /auth/login → 401 (89 ms)
 //   12:27:49 WARN: command refused ApproveVacationRequestCommand by Requester:9b1c… → FORBIDDEN (0 ms)
+//   12:27:49 INFO: event VacationRequestApprovedEvent → recordHistory: ok (3 ms)
 // The fields used here are hidden from the object dump; anything else (an error's stack) still prints.
-const lineFields = ["method", "path", "status", "command", "actor", "outcome", "event", "subscribers", "ms"];
+const lineFields = ["method", "path", "status", "command", "actor", "outcome", "event", "subscriber", "ms"];
 const lineFormat =
 	"{msg}" +
 	"{if method} {method} {path} → {status} ({ms} ms){end}" +
 	"{if command} {command} by {actor} → {outcome} ({ms} ms){end}" +
-	"{if event} {event}{end}{if subscribers} → {subscribers} subscriber(s){end}";
+	"{if event} {event} → {subscriber}: {outcome} ({ms} ms){end}";
 
 export const logger = pino({
 	level: process.env.LOG_LEVEL || "info",

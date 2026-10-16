@@ -13,7 +13,7 @@ import { CommandMiddleware } from "../command";
  * Expected refusals (AppError: 400/401/403/404/409) are warnings; anything
  * else is an error, logged with its stack.
  */
-export const loggingMiddleware: CommandMiddleware = async (command, { actor }, next) => {
+export const commandLoggingMiddleware: CommandMiddleware = async (command, { actor }, next) => {
 	const startedAt = performance.now();
 	const fields = {
 		command: command.constructor.name,

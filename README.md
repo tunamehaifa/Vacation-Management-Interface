@@ -14,5 +14,9 @@
   the API who the user is, so an expired token is noticed right away.
 - **CommandBus + EventBus with middleware.** Every command passes logging → authorization, and
   declares its allowed roles itself. Reads have no bus, so their roles are checked on the route.
+- **Honestly, this is more architecture than such a small service needs.** A plain route → service
+  layer would be simpler. Commands and events are here because the assignment asks for them.
+  NestJS with `@nestjs/cqrs` would give these buses for free, but the required Common Event
+  Framework already is the HTTP/Lambda layer, so I wrote small buses of my own.
 - **Vite proxies `/api` to the backend**, so the browser never makes cross-origin requests and
   CORS does not come into play during development.

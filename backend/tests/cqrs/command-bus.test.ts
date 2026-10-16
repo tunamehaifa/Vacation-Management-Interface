@@ -4,7 +4,7 @@ import { ForbiddenError, UnauthorizedError } from "../../src/http/errors";
 import { Access, Command, CommandClass, CommandHandler, ExecutionContext } from "../../src/cqrs/command";
 import { CommandBus } from "../../src/cqrs/command-bus";
 import { authorizationMiddleware } from "../../src/cqrs/middleware/authorization";
-import { loggingMiddleware } from "../../src/cqrs/middleware/logging";
+import { commandLoggingMiddleware } from "../../src/cqrs/middleware/command-logging";
 import { logger } from "../../src/logger";
 
 class ValidatorOnlyCommand extends Command<string> {
@@ -101,7 +101,7 @@ describe("logging middleware", () => {
 		const info = vi.spyOn(logger, "info").mockImplementation(() => {});
 		const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
 		const bus = new CommandBus()
-			.use(loggingMiddleware)
+			.use(commandLoggingMiddleware)
 			.use(authorizationMiddleware)
 			.register(ValidatorOnlyCommand, echo);
 

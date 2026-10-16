@@ -1,5 +1,3 @@
-import { logger } from "../logger";
-
 /**
  * A domain event records something that already happened
  * (VacationRequestApprovedEvent, ...). Command handlers publish events after
@@ -10,12 +8,29 @@ export abstract class DomainEvent {
 	readonly occurredAt = new Date();
 }
 
+/** Reacts to one event type. Use a named function: its name appears in the logs. */
 export type EventSubscriber<E extends DomainEvent> = (event: E) => Promise<void> | void;
+
+/**
+ * Runs around each delivery of an event to one subscriber, like the command
+ * middlewares run around a command handler. Call `next()` to deliver.
+ */
+export type EventMiddleware = (
+	event: DomainEvent,
+	subscriber: EventSubscriber<any>,
+	next: () => Promise<void>,
+) => Promise<void>;
 
 type EventClass<E extends DomainEvent> = abstract new (...args: any[]) => E;
 
 export class EventBus {
 	private readonly subscribers = new Map<Function, EventSubscriber<any>[]>();
+	private readonly middlewares: EventMiddleware[] = [];
+
+	use(middleware: EventMiddleware): this {
+		this.middlewares.push(middleware);
+		return this;
+	}
 
 	subscribe<E extends DomainEvent>(type: EventClass<E>, subscriber: EventSubscriber<E>): this {
 		const list = this.subscribers.get(type) ?? [];
@@ -25,20 +40,24 @@ export class EventBus {
 	}
 
 	/**
-	 * Delivers the event to every subscriber. The change it describes is
-	 * already committed, so one failing subscriber is logged and does not
-	 * stop the others or fail the request.
+	 * Delivers the event to every subscriber, each through the middleware
+	 * pipeline. The change the event describes is already committed, so a
+	 * failing subscriber does not stop the others or fail the request; the
+	 * logging middleware is what reports it.
 	 */
 	async publish(event: DomainEvent): Promise<void> {
-		const name = event.constructor.name;
 		const subscribers = this.subscribers.get(event.constructor) ?? [];
-		logger.info({ event: name, subscribers: subscribers.length }, "event published");
+		await Promise.allSettled(subscribers.map(async (subscriber) => this.deliver(event, subscriber)));
+	}
 
-		const results = await Promise.allSettled(subscribers.map(async (subscriber) => subscriber(event)));
-		results.forEach((result, index) => {
-			if (result.status === "rejected") {
-				logger.error({ event: name, subscriber: index + 1, err: result.reason }, "event subscriber failed");
-			}
-		});
+	private deliver(event: DomainEvent, subscriber: EventSubscriber<any>): Promise<void> {
+		const callSubscriber = async () => {
+			await subscriber(event);
+		};
+		const pipeline = this.middlewares.reduceRight<() => Promise<void>>(
+			(next, middleware) => () => middleware(event, subscriber, next),
+			callSubscriber,
+		);
+		return pipeline();
 	}
 }
