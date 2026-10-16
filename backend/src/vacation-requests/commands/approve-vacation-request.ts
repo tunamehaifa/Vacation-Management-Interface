@@ -4,7 +4,7 @@ import { EventBus } from "../../cqrs/event-bus";
 import { UserRole } from "../../entities/user.entity";
 import { VacationRequestStatus } from "../../entities/vacation-request.entity";
 import { VacationRequestApprovedEvent } from "../events";
-import { loadForUpdate } from "../repository";
+import { loadForUpdate, withOwner } from "../repository";
 import { assertNotStarted, assertPending, todayUtc } from "../rules";
 import { toView, VacationRequestView } from "../view";
 
@@ -30,7 +30,7 @@ export class ApproveVacationRequestHandler implements CommandHandler<ApproveVaca
 			assertNotStarted(request, todayUtc());
 
 			request.status = VacationRequestStatus.Approved;
-			return toView(await manager.save(request));
+			return toView(await withOwner(manager, await manager.save(request)));
 		});
 
 		await this.events.publish(new VacationRequestApprovedEvent(view, actor.id));

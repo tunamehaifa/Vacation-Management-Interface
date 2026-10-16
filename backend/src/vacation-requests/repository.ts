@@ -1,4 +1,5 @@
 import { EntityManager, In, LessThanOrEqual, MoreThanOrEqual, Not } from "typeorm";
+import { User } from "../entities/user.entity";
 import { VacationRequest, VacationRequestStatus } from "../entities/vacation-request.entity";
 import { NotFoundError } from "../http/errors";
 
@@ -46,5 +47,15 @@ export async function loadForUpdate(manager: EntityManager, id: string): Promise
 export async function loadOwnForUpdate(manager: EntityManager, id: string, userId: string): Promise<VacationRequest> {
 	const request = await loadForUpdate(manager, id);
 	if (request.userId !== userId) throw new NotFoundError("Vacation request not found");
+	return request;
+}
+
+/**
+ * Adds the owner to a request, so a validator's response says whose request
+ * it is, like the list does. Loaded separately: the row lock above cannot
+ * cover an outer join to users.
+ */
+export async function withOwner(manager: EntityManager, request: VacationRequest): Promise<VacationRequest> {
+	request.user = await manager.findOneByOrFail(User, { id: request.userId });
 	return request;
 }

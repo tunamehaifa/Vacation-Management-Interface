@@ -5,7 +5,7 @@ import { EventBus } from "../../cqrs/event-bus";
 import { UserRole } from "../../entities/user.entity";
 import { VacationRequestStatus } from "../../entities/vacation-request.entity";
 import { VacationRequestRejectedEvent } from "../events";
-import { loadForUpdate } from "../repository";
+import { loadForUpdate, withOwner } from "../repository";
 import { assertPending, requireRejectionComment } from "../rules";
 import { toView, VacationRequestView } from "../view";
 
@@ -36,7 +36,7 @@ export class RejectVacationRequestHandler implements CommandHandler<RejectVacati
 
 				request.status = VacationRequestStatus.Rejected;
 				request.comments = comment;
-				return toView(await manager.save(request));
+				return toView(await withOwner(manager, await manager.save(request)));
 			}),
 		);
 
