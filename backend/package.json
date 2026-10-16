@@ -1,0 +1,21 @@
+{
+  "name": "vacation-management-backend",
+  "version": "1.0.0",
+  "description": "Vacation management API on the Common Event Framework",
+  "type": "commonjs",
+  "scripts": {
+    "codegen": "node node_modules/commoneventframework/dist/script/generateHandlerRegistry.js",
+    "dev": "npx ts-node src/index.ts --local",
+    "build": "cef-build",
+    "build:full": "cef-build --full"
+  },
+  "dependencies": {
+    "commoneventframework": "^1.0.19"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.0.0"
+  },
+  "private": true
+}
