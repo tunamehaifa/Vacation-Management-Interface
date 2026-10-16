@@ -11,12 +11,27 @@ A web application for vacation requests:
 [Common Event Framework](https://www.npmjs.com/package/commoneventframework) (CEF) · PostgreSQL 16 + TypeORM ·
 JWT auth · pino logging · Vitest.
 
-## Getting started
+## Installation and running
 
-**You need** Node.js 22.18+ (or 24.12+) and Docker. The steps below start the database, then the
-backend, then the frontend, each in its own terminal.
+**You need** Node.js 22.18+ (or 24.12+) and Docker.
 
-### 1. Database
+### Quick start
+
+From the repository root:
+
+```bash
+npm run setup   # installs everything, creates backend/.env, starts PostgreSQL, migrates, seeds
+npm run dev     # starts PostgreSQL, the API (:8888) and the frontend (:5173) together
+```
+
+Open http://localhost:5173 and sign in with a [demo account](#demo-accounts). `npm run db:reset`
+starts again from a clean database.
+
+### Step by step
+
+The same, one part at a time, each in its own terminal.
+
+#### 1. Database setup
 
 ```bash
 docker compose up -d
@@ -25,7 +40,7 @@ docker compose up -d
 This starts PostgreSQL 16 on **port 5433**, so it does not clash with a local PostgreSQL on 5432. The
 user, password and database are all `vacation`.
 
-### 2. Backend (API on http://localhost:8888)
+#### 2. Backend (API on http://localhost:8888)
 
 ```bash
 cd backend
@@ -36,7 +51,7 @@ npm run seed            # demo users and 35 sample requests
 npm run dev
 ```
 
-### 3. Frontend (http://localhost:5173)
+#### 3. Frontend (http://localhost:5173)
 
 ```bash
 cd frontend
@@ -59,28 +74,34 @@ The seed adds requests in every status, with dates relative to today. That's eno
 pagination on the dashboard and on the team planning. Running the seed again is safe: it updates the
 users and adds sample requests only while the table is empty.
 
-### Start again from a clean database
-
-```bash
-docker compose down -v && docker compose up -d
-cd backend && npm run migration:run && npm run seed
-```
-
 ### Other commands
 
 | Where      | Command                     | What it does                                       |
 |------------|-----------------------------|----------------------------------------------------|
-| `backend`  | `npm test`                  | Unit tests: business rules, buses, pagination      |
+| root       | `npm test`                  | All backend tests: unit, then API                  |
+| root       | `npm run db:reset`          | Empty database, migrations and seed again          |
+| `backend`  | `npm test`                  | Unit tests: business rules, buses, pagination (no database needed) |
+| `backend`  | `npm run test:api`          | API integration tests (needs `docker compose up -d`), see below |
 | `backend`  | `npm run typecheck`         | TypeScript check                                   |
 | `backend`  | `npm run migration:revert`  | Undo the last migration                            |
 | `backend`  | `npm run codegen`           | Regenerate the handler registry after editing `root.yaml` |
 | `frontend` | `npm run build`             | Type check and production build                    |
 
+**API integration tests** (`backend/tests/api`) send real HTTP requests to the real server. They
+create their own database (`vacation_api_test`, dropped afterwards), run the migrations and start
+the API on port 8897, so your data is never touched. They cover:
+- login and protected routes;
+- all six business rules, including two identical requests sent at the same moment;
+- someone else's request (404);
+- pagination with no row repeated or skipped;
+- filters;
+- hiding reasons on the team planning.
+
 `backend/requests/*.http` are ready-made API calls for the VS Code
 [REST Client](https://marketplace.visualstudio.com/items?itemName=humao.rest-client) extension. They
 log in, then create, filter, page, approve and reject requests.
 
-## How it works
+## Approach: how it works
 
 ### Backend
 
@@ -142,7 +163,12 @@ status 400, 401, 403, 404 or 409. Anything unexpected is logged and answered wit
 - **Pages** (`src/views`): Login, My requests (Requester), Dashboard (Validator) and Team (both). The
   router guards check sign-in and role.
 - **Reusable components** (`src/components`): `BaseButton`, `FormField`, `BaseDialog`, `ConfirmDialog`,
-  `PaginationBar`, `StatusBadge`, `VacationRequestForm`, `ReviewDialog` and `VacationTimeline`.
+  `PaginationBar`, `StatusBadge`, `VacationRequestForm`, `RequestsTable`, `ReviewDialog` and
+  `VacationTimeline`.
+- **Composables** (`src/composables`) share the logic of the pages:
+  - `useQueryState` keeps filters and the page in the URL;
+  - `usePagedList` loads a page, ignores late answers, and steps back from an empty page;
+  - `useNotice` shows success messages that disappear after a few seconds.
 - **API layer** (`src/api`): one Axios instance adds the token and turns API errors into messages. A
   401 sends the user back to the login page.
 - **The Dashboard and Team pages keep their filters and page in the URL**, e.g.
@@ -163,12 +189,13 @@ backend/
     entities/              TypeORM entities
     database/              data source, migrations, seed
     http/                  errors, request parsing, pagination
-  tests/                   Vitest unit tests
+  tests/                   Vitest unit tests; tests/api: API integration tests
   requests/                REST Client files
 frontend/
   src/
-    views/  components/  api/  stores/  router/  utils/
+    views/  components/  composables/  api/  stores/  router/  utils/
 docker-compose.yml         PostgreSQL 16
+package.json               root commands: setup, dev, test, db:reset
 ```
 
 ## Technical decisions
