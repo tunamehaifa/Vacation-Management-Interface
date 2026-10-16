@@ -25,5 +25,11 @@
   layer would be simpler. Commands and events are here because the assignment asks for them.
   NestJS with `@nestjs/cqrs` would give these buses for free, but the required Common Event
   Framework already is the HTTP/Lambda layer, so I wrote small buses of my own.
+- **Events make a request history easy to add.** Every change already publishes an event, and
+  one subscriber writes it to an audit log. A `vacation_request_history` table (who changed
+  what, when) would be one more subscriber, with no change to the commands. Not built, as it
+  is not required.
+- **Logging with pino**: one line per HTTP request, login, command, query and event; readable
+  locally, JSON when deployed. Only ids and dates are logged, never reasons or comments.
 - **Vite proxies `/api` to the backend**, so the browser never makes cross-origin requests and
   CORS does not come into play during development.
