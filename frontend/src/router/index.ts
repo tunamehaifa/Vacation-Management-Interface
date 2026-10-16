@@ -3,7 +3,9 @@ import type { UserRole } from '@/api/auth'
 import { handleExpiredSessions, useAuthStore } from '@/stores/auth'
 import AppLayout from '@/layouts/AppLayout.vue'
 import LoginView from '@/views/LoginView.vue'
-import HomeView from '@/views/HomeView.vue'
+import MyRequestsView from '@/views/MyRequestsView.vue'
+import DashboardView from '@/views/DashboardView.vue'
+import TeamView from '@/views/TeamView.vue'
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -15,6 +17,9 @@ declare module 'vue-router' {
   }
 }
 
+export const homeFor = (role?: UserRole) =>
+  role === 'Validator' ? { name: 'dashboard' } : { name: 'my-requests' }
+
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
@@ -23,7 +28,18 @@ const router = createRouter({
       path: '/',
       component: AppLayout,
       meta: { requiresAuth: true },
-      children: [{ path: '', name: 'home', component: HomeView }],
+      children: [
+        // "/" opens the main page of the user's role.
+        { path: '', name: 'home', redirect: () => homeFor(useAuthStore().user?.role) },
+        {
+          path: 'my-requests',
+          name: 'my-requests',
+          component: MyRequestsView,
+          meta: { roles: ['Requester'] },
+        },
+        { path: 'dashboard', name: 'dashboard', component: DashboardView, meta: { roles: ['Validator'] } },
+        { path: 'team', name: 'team', component: TeamView },
+      ],
     },
     { path: '/:pathMatch(.*)*', redirect: '/' },
   ],

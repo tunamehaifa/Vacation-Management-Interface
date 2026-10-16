@@ -53,3 +53,18 @@ export const errorMessage = (error: unknown, fallback = 'Something went wrong'):
   }
   return fallback
 }
+
+/**
+ * Per-field messages from a 400 response, e.g. { endDate: 'Must be after the start date' },
+ * so a form can show each one under its input.
+ */
+export const fieldErrors = (error: unknown): Record<string, string> => {
+  if (!axios.isAxiosError(error)) return {}
+  const details = (error.response?.data as { error?: { details?: unknown } })?.error?.details
+  if (!Array.isArray(details)) return {}
+  const result: Record<string, string> = {}
+  for (const detail of details as { field?: string; message?: string }[]) {
+    if (detail.field && detail.message && !result[detail.field]) result[detail.field] = detail.message
+  }
+  return result
+}
