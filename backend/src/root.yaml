@@ -111,6 +111,16 @@ paths:
         '403': { description: Not a requester }
 
   /vacation-requests/:id:
+    get:
+      x-handler: handlers/vacation-requests#getRequestById
+      x-inputParser: handlers/vacation-requests#parseIdInput
+      summary: One request with its user (Validator)
+      security:
+        - bearerAuth: []
+      responses:
+        '200': { description: The request }
+        '403': { description: Not a validator }
+        '404': { description: No such request }
     put:
       x-handler: handlers/vacation-requests#updateRequest
       x-inputParser: handlers/vacation-requests#parseUpdateInput

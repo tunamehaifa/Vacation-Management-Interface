@@ -24,6 +24,7 @@ export class HandlerRegistry {
 			"handlers/vacation-requests#createRequest": __cef_handlers_vacation_requests.createRequest,
 			"handlers/vacation-requests#getAllRequests": __cef_handlers_vacation_requests.getAllRequests,
 			"handlers/vacation-requests#getMyRequests": __cef_handlers_vacation_requests.getMyRequests,
+			"handlers/vacation-requests#getRequestById": __cef_handlers_vacation_requests.getRequestById,
 			"handlers/vacation-requests#parseCreateInput": __cef_handlers_vacation_requests.parseCreateInput,
 			"handlers/vacation-requests#parseFilterInput": __cef_handlers_vacation_requests.parseFilterInput,
 			"handlers/vacation-requests#parseIdInput": __cef_handlers_vacation_requests.parseIdInput,

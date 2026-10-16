@@ -12,7 +12,7 @@ import { CancelVacationRequestCommand } from "../vacation-requests/commands/canc
 import { CreateVacationRequestCommand } from "../vacation-requests/commands/create-vacation-request";
 import { RejectVacationRequestCommand } from "../vacation-requests/commands/reject-vacation-request";
 import { UpdateVacationRequestCommand } from "../vacation-requests/commands/update-vacation-request";
-import { listAllRequests, listMyRequests } from "../vacation-requests/queries";
+import { getRequest, listAllRequests, listMyRequests } from "../vacation-requests/queries";
 import { InputParserFn } from "./types";
 
 /**
@@ -113,3 +113,7 @@ export const getAllRequests = authorize(
 	async ({ status, userId, page, limit }: z.infer<typeof filterSchema>) =>
 		listAllRequests({ status, userId }, { page, limit }),
 );
+
+// --- GET /vacation-requests/:id (Validator) ---
+
+export const getRequestById = authorize([UserRole.Validator], async (input: { id: string }) => getRequest(input.id));

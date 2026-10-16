@@ -38,7 +38,28 @@ export interface PageRequest {
   limit: number
 }
 
+/** The validator's list filters; leave one out to not filter on it. */
+export interface RequestFilters {
+  status?: VacationRequestStatus
+  userId?: string
+}
+
 export const vacationRequestsApi = {
+  /** Validator: every request, newest first. */
+  list: (filters: RequestFilters, paging: PageRequest) =>
+    http
+      .get<Page<VacationRequest>>('/vacation-requests', { params: { ...filters, ...paging } })
+      .then((res) => res.data),
+
+  /** Validator: one request with its user. */
+  get: (id: string) => http.get<VacationRequest>(`/vacation-requests/${id}`).then((res) => res.data),
+
+  approve: (id: string) =>
+    http.post<VacationRequest>(`/vacation-requests/${id}/approve`).then((res) => res.data),
+
+  reject: (id: string, comment: string) =>
+    http.post<VacationRequest>(`/vacation-requests/${id}/reject`, { comment }).then((res) => res.data),
+
   mine: (paging: PageRequest) =>
     http
       .get<Page<VacationRequest>>('/vacation-requests/mine', { params: paging })

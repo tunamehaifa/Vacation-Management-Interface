@@ -3,6 +3,7 @@ import type { AuthUser } from "../auth/jwt";
 import { getDataSource } from "../database/data-source";
 import { User, UserRole } from "../entities/user.entity";
 import { VacationRequest, VacationRequestStatus } from "../entities/vacation-request.entity";
+import { NotFoundError } from "../http/errors";
 import { Page, PageRequest, toPage, toSkipTake } from "../http/pagination";
 import { toView, VacationRequestView } from "./view";
 
@@ -44,6 +45,15 @@ export async function listAllRequests(
 		...toSkipTake(paging),
 	});
 	return toPage(requests.map(toView), total, paging);
+}
+
+/** Validator view: one request with its user (the dashboard opens it from a link). */
+export async function getRequest(id: string): Promise<VacationRequestView> {
+	const request = await (await getDataSource())
+		.getRepository(VacationRequest)
+		.findOne({ where: { id }, relations: { user: true } });
+	if (!request) throw new NotFoundError("Vacation request not found");
+	return toView(request);
 }
 
 const PLANNED = [VacationRequestStatus.Approved, VacationRequestStatus.Pending];
