@@ -61,6 +61,14 @@ npm run dev
 
 Open http://localhost:5173 and sign in with a demo account.
 
+### If something does not start
+
+- **Port 5433, 8888 or 5173 is already in use:** stop whatever uses it. If 5173 is taken, Vite picks
+  the next free port and prints it.
+- **The app says "Cannot reach the server":** the API is not running. Start it with `npm run dev`,
+  either from the root or from `backend`.
+- **Sign-in fails right after setup:** the seed has not run yet. Run `npm run seed` in `backend`.
+
 ### Demo accounts
 
 All accounts use the password **`Password123!`**.
@@ -91,7 +99,7 @@ users and adds sample requests only while the table is empty.
 create their own database (`vacation_api_test`, dropped afterwards), run the migrations and start
 the API on port 8897, so your data is never touched. They cover:
 - login and protected routes;
-- all six business rules, including two identical requests sent at the same moment;
+- all six business rules, including five identical requests sent at the same moment (exactly one is created);
 - someone else's request (404);
 - pagination with no row repeated or skipped;
 - filters;
@@ -105,13 +113,18 @@ log in, then create, filter, page, approve and reject requests.
 
 ### Backend
 
+Every request goes through the same steps. Writes and reads then take different paths:
+
 ```
-HTTP ─▶ CEF router (root.yaml) ─▶ input parser (zod) ─▶ handler
-                                                          │
-             writes: CommandBus ─▶ logging ─▶ authorization (roles) ─▶ command handler ─▶ PostgreSQL
-                                                                              │
-                                                                   EventBus ─▶ subscribers (audit log)
-             reads:  query function ─▶ PostgreSQL (paged)
+HTTP request
+  └─▶ CEF router (root.yaml) ─▶ input parser (zod validation) ─▶ handler
+        │
+        ├─ write (submit, edit, cancel, approve, reject)
+        │    CommandBus ─▶ logging ─▶ role check ─▶ command handler ─▶ PostgreSQL (transaction)
+        │                                                └─▶ EventBus ─▶ subscribers (audit log)
+        │
+        └─ read (lists, team planning)
+             role check on the route ─▶ query function ─▶ PostgreSQL (paged)
 ```
 
 - **`root.yaml`** lists every route with its handler and parser. It is also the OpenAPI description of the API.
@@ -132,7 +145,7 @@ HTTP ─▶ CEF router (root.yaml) ─▶ input parser (zod) ─▶ handler
 | 3. Approved requests can't be modified | `assertPending`, with the row locked              | —                                        |
 | 4. No requests in the past            | `assertValidPeriod` (start ≥ today); `assertNotStarted` on approval | — (depends on "today")  |
 | 5. Rejection needs a comment          | `requireRejectionComment`                         | `CHECK` on `status` and `comments`       |
-| 6. Only validators approve or reject  | `static access = [UserRole.Validator]` on both commands | —                                  |
+| 6. Only validators approve or reject  | `static access = [UserRole.Validator]` on the Approve and Reject commands | —                |
 
 **Errors:** every error has the same shape, `{ "error": { "code", "message", "details"? } }`, with
 status 400, 401, 403, 404 or 409. Anything unexpected is logged and answered with a plain 500.
@@ -166,13 +179,12 @@ status 400, 401, 403, 404 or 409. Anything unexpected is logged and answered wit
   `PaginationBar`, `StatusBadge`, `VacationRequestForm`, `RequestsTable`, `ReviewDialog` and
   `VacationTimeline`.
 - **Composables** (`src/composables`) share the logic of the pages:
-  - `useQueryState` keeps filters and the page in the URL;
+  - `useQueryState` keeps filters and the page in the URL (e.g. `/dashboard?status=Pending&page=2`),
+    so reload, Back and shared links work;
   - `usePagedList` loads a page, ignores late answers, and steps back from an empty page;
   - `useNotice` shows success messages that disappear after a few seconds.
 - **API layer** (`src/api`): one Axios instance adds the token and turns API errors into messages. A
   401 sends the user back to the login page.
-- **The Dashboard and Team pages keep their filters and page in the URL**, e.g.
-  `/dashboard?status=Pending&page=2`, so reload, Back and shared links work.
 
 ### Project structure
 
@@ -200,6 +212,8 @@ package.json               root commands: setup, dev, test, db:reset
 
 ## Technical decisions
 
+### How I read the requirements
+
 - **End date strictly after start date.** A one-day vacation would make sense, but I followed
   the description literally (`end_date > start_date`).
 - **A vacation may start today.** "Requests in the past are not allowed" is read as
@@ -211,14 +225,24 @@ package.json               root commands: setup, dev, test, db:reset
   assignment defines only three statuses.
 - **Team planning is a monthly timeline** (both roles): who is away when, Approved and Pending.
   A reason can be personal, so only validators and the owner see it; colleagues see just the dates.
+  It is paged by person, not by vacation, so a person's row is never split across pages.
+
+### Database
+
 - **PostgreSQL enums** for `user_role` and `vacation_request_status`. A string field would
   accept any value, and separate tables would be overengineering for a few fixed values.
 - **Rules also enforced by the database**: date order, a comment on rejection, and no
   overlapping requests per user (`EXCLUDE` constraint), so even concurrent requests can't break them.
 - **Small hand-written migrations**, one purpose each, so the schema is easy to read.
+
+### Authentication
+
 - **JWT in `localStorage`, sent as `Authorization: Bearer`.** An httpOnly cookie is safer, but would be overengineering here.
 - **`GET /auth/me` after a page reload.** The frontend keeps only the token; on start it asks
   the API who the user is, so an expired token is noticed right away.
+
+### Architecture
+
 - **CommandBus + EventBus with middleware.** Every command passes logging → authorization, and
   declares its allowed roles itself. Reads have no bus, so their roles are checked on the route.
 - **Honestly, this is more architecture than such a small service needs.** A plain route → service
@@ -231,7 +255,6 @@ package.json               root commands: setup, dev, test, db:reset
   is not required.
 - **Logging with pino**: one line per HTTP request, login, command, query and event; readable
   locally, JSON when deployed. Only ids and dates are logged, never reasons or comments.
-- **Team planning is paged by person**, not by vacation, so a person's row is never split across pages.
 - **Vite proxies `/api` to the backend**, so the browser never makes cross-origin requests and
   CORS does not come into play during development.
 
