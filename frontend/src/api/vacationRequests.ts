@@ -24,13 +24,25 @@ export interface VacationPeriod {
   reason: string | null
 }
 
-interface ItemsResponse<T> {
+/** One page of a list: `total` counts the items on all pages. */
+export interface Page<T> {
   items: T[]
+  page: number
+  limit: number
+  total: number
+  totalPages: number
+}
+
+export interface PageRequest {
+  page: number
+  limit: number
 }
 
 export const vacationRequestsApi = {
-  mine: () =>
-    http.get<ItemsResponse<VacationRequest>>('/vacation-requests/mine').then((res) => res.data.items),
+  mine: (paging: PageRequest) =>
+    http
+      .get<Page<VacationRequest>>('/vacation-requests/mine', { params: paging })
+      .then((res) => res.data),
 
   create: (period: VacationPeriod) =>
     http.post<VacationRequest>('/vacation-requests', period).then((res) => res.data),

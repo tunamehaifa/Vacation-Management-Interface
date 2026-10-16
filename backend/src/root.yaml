@@ -90,18 +90,24 @@ paths:
       parameters:
         - { in: query, name: status, schema: { type: string, enum: [Pending, Approved, Rejected] } }
         - { in: query, name: userId, schema: { type: string, format: uuid } }
+        - { in: query, name: page, schema: { type: integer, minimum: 1, default: 1 } }
+        - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 100, default: 10 } }
       responses:
-        '200': { description: "{ items }" }
+        '200': { description: "{ items, page, limit, total, totalPages }" }
         '403': { description: Not a validator }
 
   /vacation-requests/mine:
     get:
       x-handler: handlers/vacation-requests#getMyRequests
-      summary: The signed-in requester's own requests
+      x-inputParser: handlers/vacation-requests#parseMineInput
+      summary: The signed-in requester's own requests, newest first
       security:
         - bearerAuth: []
+      parameters:
+        - { in: query, name: page, schema: { type: integer, minimum: 1, default: 1 } }
+        - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 100, default: 10 } }
       responses:
-        '200': { description: "{ items }" }
+        '200': { description: "{ items, page, limit, total, totalPages }" }
         '403': { description: Not a requester }
 
   /vacation-requests/:id:
@@ -170,8 +176,10 @@ paths:
       parameters:
         - { in: query, name: from, schema: { type: string, format: date }, description: Defaults to today }
         - { in: query, name: to, schema: { type: string, format: date }, description: Defaults to from + 90 days }
+        - { in: query, name: page, schema: { type: integer, minimum: 1, default: 1 } }
+        - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 100, default: 10 }, description: People per page }
       responses:
-        '200': { description: "{ from, to, items } — reasons only for validators and for the viewer's own vacations" }
+        '200': { description: "{ from, to, items, page, limit, total, totalPages } — paged by person (total = people); reasons only for validators and the viewer's own vacations" }
 
   /users:
     get:

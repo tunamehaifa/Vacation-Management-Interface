@@ -5,6 +5,7 @@ import { authenticate, authorize } from "../auth/authorize";
 import { commandBus } from "../buses";
 import { UserRole } from "../entities/user.entity";
 import { VacationRequestStatus } from "../entities/vacation-request.entity";
+import { paginationSchema } from "../http/pagination";
 import { parseBody, parseIdParam, parseQuery } from "../http/request";
 import { ApproveVacationRequestCommand } from "../vacation-requests/commands/approve-vacation-request";
 import { CancelVacationRequestCommand } from "../vacation-requests/commands/cancel-vacation-request";
@@ -89,21 +90,26 @@ export const rejectRequest = authenticate(
 		commandBus.execute(new RejectVacationRequestCommand(input.id, input.comment), { actor }),
 );
 
-// --- GET /vacation-requests/mine (Requester) ---
+// --- GET /vacation-requests/mine?page=&limit= (Requester) ---
 
-export const getMyRequests = authorize([UserRole.Requester], async (_input, _event, user) => ({
-	items: await listMyRequests(user.id),
-}));
+export const parseMineInput: InputParserFn = (event) => parseQuery(event, paginationSchema);
 
-// --- GET /vacation-requests?status=&userId= (Validator) ---
+export const getMyRequests = authorize(
+	[UserRole.Requester],
+	async (input: z.infer<typeof paginationSchema>, _event, user) => listMyRequests(user.id, input),
+);
 
-const filterSchema = z.object({
+// --- GET /vacation-requests?status=&userId=&page=&limit= (Validator) ---
+
+const filterSchema = paginationSchema.extend({
 	status: z.enum(VacationRequestStatus).optional(),
 	userId: z.uuid().optional(),
 });
 
 export const parseFilterInput: InputParserFn = (event) => parseQuery(event, filterSchema);
 
-export const getAllRequests = authorize([UserRole.Validator], async (input: z.infer<typeof filterSchema>) => ({
-	items: await listAllRequests(input),
-}));
+export const getAllRequests = authorize(
+	[UserRole.Validator],
+	async ({ status, userId, page, limit }: z.infer<typeof filterSchema>) =>
+		listAllRequests({ status, userId }, { page, limit }),
+);

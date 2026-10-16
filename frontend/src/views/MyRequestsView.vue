@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { onBeforeUnmount, ref, watch } from 'vue'
 import { errorMessage } from '@/api/http'
 import { vacationRequestsApi, type VacationPeriod, type VacationRequest } from '@/api/vacationRequests'
 import { daysInclusive, formatDate } from '@/utils/dates'
@@ -7,12 +7,17 @@ import AlertMessage from '@/components/AlertMessage.vue'
 import BaseButton from '@/components/BaseButton.vue'
 import BaseDialog from '@/components/BaseDialog.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import PaginationBar from '@/components/PaginationBar.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 import VacationRequestForm from '@/components/VacationRequestForm.vue'
 
 /** Requester page: submit a request, see my requests, edit or cancel Pending ones. */
 
+const PAGE_SIZE = 10
+
 const requests = ref<VacationRequest[]>([])
+const page = ref(1)
+const total = ref(0)
 const loading = ref(true)
 const loadError = ref('')
 const notice = ref('')
@@ -20,27 +25,40 @@ const notice = ref('')
 async function load() {
   loadError.value = ''
   try {
-    requests.value = await vacationRequestsApi.mine()
+    const result = await vacationRequestsApi.mine({ page: page.value, limit: PAGE_SIZE })
+    // Cancelling the last request of the last page leaves it empty: show the previous one.
+    if (result.items.length === 0 && page.value > 1) {
+      page.value = Math.max(1, result.totalPages)
+      return
+    }
+    requests.value = result.items
+    total.value = result.total
   } catch (error) {
     loadError.value = errorMessage(error, 'Could not load your requests')
   } finally {
     loading.value = false
   }
 }
-onMounted(load)
+watch(page, load, { immediate: true })
 
 // Success messages disappear after a few seconds, so an old one never sits next to a new error.
 let noticeTimer: ReturnType<typeof setTimeout> | undefined
-function done(message: string) {
+function done(message: string, reload = true) {
   notice.value = message
   clearTimeout(noticeTimer)
   noticeTimer = setTimeout(() => (notice.value = ''), 4000)
-  return load()
+  if (reload) return load()
 }
 onBeforeUnmount(() => clearTimeout(noticeTimer))
 
-// --- create ---
+// --- create: the newest request is first, so show page 1 afterwards ---
 const create = (period: VacationPeriod) => vacationRequestsApi.create(period)
+
+function onCreated() {
+  const alreadyOnFirstPage = page.value === 1
+  page.value = 1 // when it changes, the page watcher reloads
+  done('Request submitted.', alreadyOnFirstPage)
+}
 
 // --- edit (Pending only) ---
 const editing = ref<VacationRequest | null>(null)
@@ -93,7 +111,7 @@ const days = (request: VacationRequest) => daysInclusive(request.startDate, requ
       <h1 class="text-xl font-semibold text-gray-900">New vacation request</h1>
       <p class="mt-1 text-sm text-gray-600">It stays Pending until a validator approves or rejects it.</p>
       <div class="mt-6">
-        <VacationRequestForm :save="create" @saved="done('Request submitted.')" />
+        <VacationRequestForm :save="create" @saved="onCreated" />
       </div>
     </section>
 
@@ -132,6 +150,8 @@ const days = (request: VacationRequest) => daysInclusive(request.startDate, requ
           </div>
         </li>
       </ul>
+
+      <PaginationBar v-model:page="page" class="mt-4" :total="total" :limit="PAGE_SIZE" noun="requests" />
     </section>
 
     <BaseDialog v-model:open="editOpen" title="Edit request">
