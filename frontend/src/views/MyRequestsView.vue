@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { onBeforeUnmount, ref, watch } from 'vue'
-import { errorMessage } from '@/api/http'
+import { ref, watch } from 'vue'
 import { vacationRequestsApi, type VacationPeriod, type VacationRequest } from '@/api/vacationRequests'
+import { errorMessage } from '@/api/http'
+import { useNotice } from '@/composables/useNotice'
+import { usePagedList } from '@/composables/usePagedList'
 import { daysInclusive, formatDate } from '@/utils/dates'
 import AlertMessage from '@/components/AlertMessage.vue'
 import BaseButton from '@/components/BaseButton.vue'
@@ -15,41 +17,21 @@ import VacationRequestForm from '@/components/VacationRequestForm.vue'
 
 const PAGE_SIZE = 10
 
-const requests = ref<VacationRequest[]>([])
 const page = ref(1)
-const total = ref(0)
-const loading = ref(true)
-const loadError = ref('')
-const notice = ref('')
+const list = usePagedList({
+  fetch: () => vacationRequestsApi.mine({ page: page.value, limit: PAGE_SIZE }),
+  page,
+  goToPage: (target) => (page.value = target), // the page watcher reloads
+  errorText: 'Could not load your requests',
+})
+const { items: requests, total, loading, error: loadError } = list
+watch(page, list.load, { immediate: true })
 
-async function load() {
-  loadError.value = ''
-  try {
-    const result = await vacationRequestsApi.mine({ page: page.value, limit: PAGE_SIZE })
-    // Cancelling the last request of the last page leaves it empty: show the previous one.
-    if (result.items.length === 0 && page.value > 1) {
-      page.value = Math.max(1, result.totalPages)
-      return
-    }
-    requests.value = result.items
-    total.value = result.total
-  } catch (error) {
-    loadError.value = errorMessage(error, 'Could not load your requests')
-  } finally {
-    loading.value = false
-  }
-}
-watch(page, load, { immediate: true })
-
-// Success messages disappear after a few seconds, so an old one never sits next to a new error.
-let noticeTimer: ReturnType<typeof setTimeout> | undefined
+const { notice, show: showNotice } = useNotice()
 function done(message: string, reload = true) {
-  notice.value = message
-  clearTimeout(noticeTimer)
-  noticeTimer = setTimeout(() => (notice.value = ''), 4000)
-  if (reload) return load()
+  showNotice(message)
+  if (reload) return list.load()
 }
-onBeforeUnmount(() => clearTimeout(noticeTimer))
 
 // --- create: the newest request is first, so show page 1 afterwards ---
 const create = (period: VacationPeriod) => vacationRequestsApi.create(period)
@@ -121,7 +103,7 @@ const days = (request: VacationRequest) => daysInclusive(request.startDate, requ
       <AlertMessage v-if="notice" variant="success" class="mt-4">{{ notice }}</AlertMessage>
       <AlertMessage v-if="loadError" class="mt-4">{{ loadError }}</AlertMessage>
 
-      <p v-if="loading" class="mt-4 text-sm text-gray-500">Loading…</p>
+      <p v-if="loading && requests.length === 0" class="mt-4 text-sm text-gray-500">Loading…</p>
       <p v-else-if="!loadError && requests.length === 0" class="mt-4 text-sm text-gray-500">
         You have no vacation requests yet.
       </p>

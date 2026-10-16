@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { errorMessage } from '@/api/http'
+import { useRoute } from 'vue-router'
 import { teamApi } from '@/api/team'
 import type { VacationRequest } from '@/api/vacationRequests'
+import { usePagedList } from '@/composables/usePagedList'
+import { pageParam, useQueryState, type QueryParam } from '@/composables/useQueryState'
 import { useAuthStore } from '@/stores/auth'
 import { addMonths, daysInclusive, formatDate, formatMonth, monthEnd, monthStart, todayIso } from '@/utils/dates'
 import AlertMessage from '@/components/AlertMessage.vue'
@@ -14,99 +15,51 @@ import VacationTimeline from '@/components/VacationTimeline.vue'
 
 /**
  * Team planning (both roles): who is away when, one month at a time.
- * The month and the page live in the URL (/team?month=2026-11&page=2),
- * so a reload, the back button and a shared link all show the same view.
+ * The month and the page live in the URL (/team?month=2026-11&page=2).
  */
 
 const auth = useAuthStore()
 const isValidator = computed(() => auth.user?.role === 'Validator')
 const route = useRoute()
-const router = useRouter()
 
 const PEOPLE_PER_PAGE = 10
 const currentMonth = () => monthStart(todayIso())
 
-/** "2026-11" from the URL → "2026-11-01"; anything else → null. */
-function monthFromQuery(value: unknown): string | null {
-  if (typeof value !== 'string' || !/^\d{4}-(0[1-9]|1[0-2])$/.test(value)) return null
-  return `${value}-01`
+/** "2026-11" in the URL, "2026-11-01" in the code. */
+const monthParam: QueryParam<string> = {
+  parse: (raw) => (/^\d{4}-(0[1-9]|1[0-2])$/.test(raw) ? `${raw}-01` : null),
+  fallback: currentMonth,
+  serialize: (month) => month.slice(0, 7),
 }
 
-function pageFromQuery(value: unknown): number | null {
-  if (typeof value !== 'string' || !/^[1-9]\d*$/.test(value)) return null
-  return Number(value)
-}
-
-const month = computed(() => monthFromQuery(route.query.month) ?? currentMonth())
-const page = computed(() => pageFromQuery(route.query.page) ?? 1)
+const { params, update } = useQueryState({ month: monthParam, page: pageParam })
+const month = computed(() => params.value.month)
 const from = computed(() => month.value)
 const to = computed(() => monthEnd(month.value))
 
-/** Moves to another month or page; a new history entry, so Back returns to the previous view. */
-function show(target: { month?: string; page?: number }, replace = false) {
-  const query = {
-    ...route.query,
-    month: (target.month ?? month.value).slice(0, 7),
-    page: String(target.page ?? page.value),
-  }
-  return replace ? router.replace({ query }) : router.push({ query })
-}
-
-// Missing or broken keys (e.g. /team from the header) are filled in, without an extra history entry.
-watch(
-  () => [route.query.month, route.query.page],
-  () => {
-    if (route.name !== 'team') return // leaving the page
-    if (monthFromQuery(route.query.month) && pageFromQuery(route.query.page)) return
-    show({}, true)
-  },
-  { immediate: true },
-)
-
-const vacations = ref<VacationRequest[]>([])
-const totalPeople = ref(0)
-const loading = ref(true)
-const loadError = ref('')
+const list = usePagedList({
+  fetch: () => teamApi.vacations(from.value, to.value, { page: params.value.page, limit: PEOPLE_PER_PAGE }),
+  page: computed(() => params.value.page),
+  goToPage: (page) => update({ page }, { replace: true }),
+  errorText: 'Could not load the team calendar',
+})
+const { items: vacations, total: totalPeople, loading, error: loadError } = list
 const selected = ref<VacationRequest | null>(null)
 
-// Requests can be answered out of order when clicking quickly; only the latest counts.
-let latest = 0
-async function load() {
-  const request = ++latest
-  loading.value = true
-  loadError.value = ''
-  try {
-    const result = await teamApi.vacations(from.value, to.value, { page: page.value, limit: PEOPLE_PER_PAGE })
-    if (request !== latest) return
-    // A page past the end (an old link, fewer people now): show the last real one.
-    if (result.items.length === 0 && page.value > 1) {
-      show({ page: Math.max(1, result.totalPages) }, true)
-      return
-    }
-    vacations.value = result.items
-    totalPeople.value = result.total
-  } catch (error) {
-    if (request === latest) loadError.value = errorMessage(error, 'Could not load the team calendar')
-  } finally {
-    if (request === latest) loading.value = false
-  }
-}
-
 watch(
-  [month, page],
+  () => [params.value.month, params.value.page],
   () => {
     if (route.name !== 'team') return
     selected.value = null
-    load()
+    list.load()
   },
   { immediate: true },
 )
 
 // A new month starts again at its first page of people.
-const goTo = (offset: number) => show({ month: addMonths(month.value, offset), page: 1 })
-const goToday = () => show({ month: currentMonth(), page: 1 })
+const goTo = (offset: number) => update({ month: addMonths(month.value, offset), page: 1 })
+const goToday = () => update({ month: currentMonth(), page: 1 })
 const isCurrentMonth = computed(() => month.value === currentMonth())
-const changePage = (target: number) => show({ page: target })
 
 function select(vacation: VacationRequest) {
   selected.value = selected.value?.id === vacation.id ? null : vacation
@@ -163,12 +116,12 @@ function select(vacation: VacationRequest) {
         @select="select"
       />
       <PaginationBar
-        :page="page"
+        :page="params.page"
         class="mt-4"
         :total="totalPeople"
         :limit="PEOPLE_PER_PAGE"
         noun="people away this month"
-        @update:page="changePage"
+        @update:page="update({ page: $event })"
       />
     </div>
 

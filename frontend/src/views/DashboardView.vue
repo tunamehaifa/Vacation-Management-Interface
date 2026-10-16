@@ -1,128 +1,66 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { useRoute, useRouter, type LocationQueryRaw } from 'vue-router'
+import { computed, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { errorMessage } from '@/api/http'
 import { usersApi, type UserSummary } from '@/api/users'
-import {
-  isOverdue,
-  vacationRequestsApi,
-  type VacationRequest,
-  type VacationRequestStatus,
-} from '@/api/vacationRequests'
-import { daysInclusive, formatDate, todayIso } from '@/utils/dates'
+import { vacationRequestsApi, type VacationRequest, type VacationRequestStatus } from '@/api/vacationRequests'
+import { useNotice } from '@/composables/useNotice'
+import { usePagedList } from '@/composables/usePagedList'
+import { idParam, oneOf, pageParam, useQueryState } from '@/composables/useQueryState'
 import AlertMessage from '@/components/AlertMessage.vue'
-import BaseButton from '@/components/BaseButton.vue'
 import PaginationBar from '@/components/PaginationBar.vue'
+import RequestsTable from '@/components/RequestsTable.vue'
 import ReviewDialog, { type ReviewMode } from '@/components/ReviewDialog.vue'
-import StatusBadge from '@/components/StatusBadge.vue'
 
 /**
  * Validator dashboard: every request, filtered by status and employee, with
  * Approve / Reject. The filters, the page and an opened request live in the URL
- * (/dashboard?status=Pending&user=…&page=2&request=…), so a reload, the back
- * button and links from other pages (Team) all work.
+ * (/dashboard?status=Pending&user=…&page=2&request=…).
  */
-
-const route = useRoute()
-const router = useRouter()
 
 const PAGE_SIZE = 10
 const STATUSES = ['Pending', 'Approved', 'Rejected', 'All'] as const
 type StatusFilter = (typeof STATUSES)[number]
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-const text = (value: unknown) => (typeof value === 'string' ? value : null)
-
-const statusFromQuery = (value: unknown) =>
-  STATUSES.find((status) => status === value) ?? null
-const pageFromQuery = (value: unknown) => {
-  const raw = text(value)
-  return raw && /^[1-9]\d*$/.test(raw) ? Number(raw) : null
-}
-const idFromQuery = (value: unknown) => {
-  const raw = text(value)
-  return raw && UUID.test(raw) ? raw : null
-}
-
+const route = useRoute()
 // The Pending ones are the validator's to-do list, so they come first.
-const status = computed<StatusFilter>(() => statusFromQuery(route.query.status) ?? 'Pending')
-const userId = computed(() => idFromQuery(route.query.user))
-const page = computed(() => pageFromQuery(route.query.page) ?? 1)
-const openedId = computed(() => idFromQuery(route.query.request))
-
-/** Changes the URL keys given; null removes one. */
-function show(changes: Record<string, string | number | null>, replace = false) {
-  const query: LocationQueryRaw = { ...route.query }
-  for (const [key, value] of Object.entries(changes)) {
-    if (value === null) delete query[key]
-    else query[key] = String(value)
-  }
-  return replace ? router.replace({ query }) : router.push({ query })
-}
-
-// Missing or broken keys are filled in or dropped, without an extra history entry.
-watch(
-  () => route.query,
-  (query) => {
-    if (route.name !== 'dashboard') return // leaving the page
-    const fixes: Record<string, string | number | null> = {}
-    if (!statusFromQuery(query.status)) fixes.status = status.value
-    if (!pageFromQuery(query.page)) fixes.page = page.value
-    if (query.user !== undefined && !userId.value) fixes.user = null
-    if (query.request !== undefined && !openedId.value) fixes.request = null
-    if (Object.keys(fixes).length) show(fixes, true)
-  },
-  { immediate: true },
-)
+const { params, update } = useQueryState({
+  status: oneOf(STATUSES, 'Pending'),
+  user: idParam,
+  page: pageParam,
+  request: idParam,
+})
+const status = computed(() => params.value.status)
+const userId = computed(() => params.value.user)
 
 // --- the list ---
 
-const requests = ref<VacationRequest[]>([])
-const total = ref(0)
-const loading = ref(true)
-const loadError = ref('')
-
-// Requests can be answered out of order when clicking quickly; only the latest counts.
-let latest = 0
-async function load() {
-  const request = ++latest
-  loading.value = true
-  loadError.value = ''
-  try {
-    const result = await vacationRequestsApi.list(
+const list = usePagedList({
+  fetch: () =>
+    vacationRequestsApi.list(
       {
         status: status.value === 'All' ? undefined : (status.value as VacationRequestStatus),
         userId: userId.value ?? undefined,
       },
-      { page: page.value, limit: PAGE_SIZE },
-    )
-    if (request !== latest) return
-    // A page past the end (the last Pending one was just decided, or an old link): show the last real one.
-    if (result.items.length === 0 && page.value > 1) {
-      show({ page: Math.max(1, result.totalPages) }, true)
-      return
-    }
-    requests.value = result.items
-    total.value = result.total
-  } catch (error) {
-    if (request === latest) loadError.value = errorMessage(error, 'Could not load the requests')
-  } finally {
-    if (request === latest) loading.value = false
-  }
-}
+      { page: params.value.page, limit: PAGE_SIZE },
+    ),
+  page: computed(() => params.value.page),
+  goToPage: (page) => update({ page }, { replace: true }),
+  errorText: 'Could not load the requests',
+})
+const { items: requests, total, loading, error: loadError } = list
 
 watch(
-  [status, userId, page],
+  () => [params.value.status, params.value.user, params.value.page],
   () => {
-    if (route.name === 'dashboard') load()
+    if (route.name === 'dashboard') list.load()
   },
   { immediate: true },
 )
 
 // A new filter starts again at page 1.
-const setStatus = (value: StatusFilter) => show({ status: value, page: 1 })
-const setUser = (value: string) => show({ user: value || null, page: 1 })
-const changePage = (target: number) => show({ page: target })
+const setStatus = (value: StatusFilter) => update({ status: value, page: 1 })
+const setUser = (value: string) => update({ user: value || null, page: 1 })
 
 // The employee filter lists requesters; without it the dashboard still works.
 const people = ref<UserSummary[]>([])
@@ -147,7 +85,7 @@ function review(request: VacationRequest, mode: ReviewMode) {
 // ?request=<id> (e.g. "Review on dashboard" on the Team page) opens that request,
 // wherever it is in the list.
 watch(
-  openedId,
+  () => params.value.request,
   async (id) => {
     if (!id || reviewing.value?.id === id) return
     reviewError.value = ''
@@ -155,7 +93,7 @@ watch(
       review(await vacationRequestsApi.get(id), 'view')
     } catch (error) {
       reviewError.value = errorMessage(error, 'Could not open that request')
-      show({ request: null }, true)
+      update({ request: null }, { replace: true })
     }
   },
   { immediate: true },
@@ -165,25 +103,13 @@ watch(
 watch(reviewOpen, (isOpen) => {
   if (isOpen) return
   reviewing.value = null
-  if (openedId.value) show({ request: null }, true)
-  load()
+  if (params.value.request) update({ request: null }, { replace: true })
+  list.load()
 })
 
-const notice = ref('')
-let noticeTimer: ReturnType<typeof setTimeout> | undefined
-function onDecided(message: string) {
-  notice.value = message
-  clearTimeout(noticeTimer)
-  noticeTimer = setTimeout(() => (notice.value = ''), 4000)
-}
-onBeforeUnmount(() => clearTimeout(noticeTimer))
+const { notice, show: showNotice } = useNotice()
 
 // --- display ---
-
-const period = (request: VacationRequest) =>
-  `${formatDate(request.startDate)} – ${formatDate(request.endDate)}`
-const days = (request: VacationRequest) => daysInclusive(request.startDate, request.endDate)
-const overdue = (request: VacationRequest) => isOverdue(request, todayIso())
 
 const emptyText = computed(() =>
   status.value === 'Pending' && !userId.value
@@ -239,78 +165,23 @@ const tabClass = (value: StatusFilter) =>
     <div :class="{ 'opacity-60 transition-opacity': loading }" :aria-busy="loading">
       <p v-if="loading && requests.length === 0" class="text-sm text-gray-500">Loading…</p>
       <p v-else-if="!loadError && requests.length === 0" class="text-sm text-gray-500">{{ emptyText }}</p>
-
-      <template v-else>
-        <!-- Phones: one card per request -->
-        <ul class="divide-y divide-gray-200 overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-gray-200 md:hidden">
-          <li v-for="request in requests" :key="request.id" class="space-y-2 p-4">
-            <div class="flex items-center justify-between gap-2">
-              <span class="font-medium text-gray-900">{{ request.user?.name }}</span>
-              <StatusBadge :status="request.status" />
-            </div>
-            <p class="text-sm text-gray-700">{{ period(request) }} · {{ days(request) }} days</p>
-            <p v-if="request.reason" class="text-sm break-words text-gray-600">{{ request.reason }}</p>
-            <p v-if="request.comments" class="text-sm break-words text-gray-600">
-              <span class="font-medium">Comment:</span> {{ request.comments }}
-            </p>
-            <p v-if="overdue(request)" class="text-sm text-amber-700">Start date has passed: it can only be rejected.</p>
-            <div v-if="request.status === 'Pending'" class="flex gap-2 pt-1">
-              <BaseButton class="flex-1" :disabled="overdue(request)" @click="review(request, 'approve')">
-                Approve
-              </BaseButton>
-              <BaseButton class="flex-1" variant="secondary" @click="review(request, 'reject')">Reject</BaseButton>
-            </div>
-          </li>
-        </ul>
-
-        <!-- Wider screens: a table -->
-        <div class="hidden overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-gray-200 md:block">
-          <table class="min-w-full divide-y divide-gray-200 text-sm">
-            <thead class="bg-gray-50 text-left text-xs font-medium tracking-wide text-gray-500 uppercase">
-              <tr>
-                <th scope="col" class="px-4 py-3">Employee</th>
-                <th scope="col" class="px-4 py-3">Period</th>
-                <th scope="col" class="px-4 py-3 text-right">Days</th>
-                <th scope="col" class="px-4 py-3">Reason</th>
-                <th scope="col" class="px-4 py-3">Status</th>
-                <th scope="col" class="px-4 py-3"><span class="sr-only">Actions</span></th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-200">
-              <tr v-for="request in requests" :key="request.id" class="align-top">
-                <td class="px-4 py-3 font-medium whitespace-nowrap text-gray-900">{{ request.user?.name }}</td>
-                <td class="px-4 py-3 whitespace-nowrap text-gray-700">{{ period(request) }}</td>
-                <td class="px-4 py-3 text-right text-gray-700 tabular-nums">{{ days(request) }}</td>
-                <td class="max-w-xs px-4 py-3 break-words text-gray-600">{{ request.reason || '—' }}</td>
-                <td class="max-w-xs px-4 py-3">
-                  <StatusBadge :status="request.status" />
-                  <p v-if="request.comments" class="mt-1 break-words text-gray-600">{{ request.comments }}</p>
-                  <p v-if="overdue(request)" class="mt-1 text-xs text-amber-700">
-                    Start date has passed: it can only be rejected.
-                  </p>
-                </td>
-                <td class="px-4 py-3">
-                  <div v-if="request.status === 'Pending'" class="flex justify-end gap-2">
-                    <BaseButton :disabled="overdue(request)" @click="review(request, 'approve')">Approve</BaseButton>
-                    <BaseButton variant="secondary" @click="review(request, 'reject')">Reject</BaseButton>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </template>
+      <RequestsTable
+        v-else
+        :requests="requests"
+        @approve="review($event, 'approve')"
+        @reject="review($event, 'reject')"
+      />
 
       <PaginationBar
-        :page="page"
+        :page="params.page"
         class="mt-4"
         :total="total"
         :limit="PAGE_SIZE"
         noun="requests"
-        @update:page="changePage"
+        @update:page="update({ page: $event })"
       />
     </div>
 
-    <ReviewDialog v-model:open="reviewOpen" :request="reviewing" :mode="reviewMode" @decided="onDecided" />
+    <ReviewDialog v-model:open="reviewOpen" :request="reviewing" :mode="reviewMode" @decided="showNotice" />
   </div>
 </template>
