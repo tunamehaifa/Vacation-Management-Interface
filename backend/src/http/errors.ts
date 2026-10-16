@@ -1,4 +1,5 @@
 import { Response } from "commoneventframework";
+import { logger } from "../logger";
 
 /**
  * Errors that carry their HTTP status. Parsers, handlers and commands throw
@@ -57,6 +58,6 @@ export const toErrorResponse = (err: unknown): Response => {
 			error: { code: err.code, message: err.message, details: err.details },
 		});
 	}
-	console.error("Unhandled error:", err);
+	logger.error({ err }, "unhandled error");
 	return new Response(500, { error: { code: "INTERNAL_ERROR", message: "Internal server error" } });
 };

@@ -13,11 +13,14 @@ export type AuthorizedHandlerFn<TInput = any> = (
 ) => Promise<APIGatewayProxyStructuredResultV2 | object>;
 
 /**
- * Protects a route: the request needs a valid `Authorization: Bearer <JWT>`
+ * Protects a read route: the request needs a valid `Authorization: Bearer <JWT>`
  * (else 401) whose role is one of `roles` (else 403). Only then is the handler
  * called, with the authenticated user as its third argument.
  *
- *   export const approve = authorize([UserRole.Validator], async (input, event, user) => ...);
+ * Routes that change state use `authenticate` instead and let the CommandBus
+ * check roles (see src/cqrs/middleware/authorization.ts).
+ *
+ *   export const listAll = authorize([UserRole.Validator], async (input, event, user) => ...);
  */
 export const authorize =
 	<TInput = any>(roles: readonly UserRole[], handler: AuthorizedHandlerFn<TInput>): HandlerFn =>
@@ -34,3 +37,11 @@ export const authorize =
 	};
 
 export const ANY_ROLE: readonly UserRole[] = Object.values(UserRole);
+
+/**
+ * For routes that send a command: only proves who the caller is (401 without
+ * a valid token). Which roles may run the command is declared on the command
+ * and enforced by the CommandBus's authorization middleware.
+ */
+export const authenticate = <TInput = any>(handler: AuthorizedHandlerFn<TInput>): HandlerFn =>
+	authorize(ANY_ROLE, handler);

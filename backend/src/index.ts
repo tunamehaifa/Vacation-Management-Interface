@@ -17,6 +17,7 @@ import {
 import { CommonEvent, LambdaEvent } from "commoneventframework/dist/types/commonEvent";
 import { HandlerFn, InputParserFn } from "./handlers/types";
 import { NotFoundError, toErrorResponse } from "./http/errors";
+import { logger } from "./logger";
 
 export const handler = async (
 	event: LambdaEvent,
@@ -26,6 +27,15 @@ export const handler = async (
 	await setLambdaContext(context);
 	const commonEvent: CommonEvent = await buildCommonEvent(event);
 
+	const startedAt = performance.now();
+	const response = await route(commonEvent);
+	const ms = Math.round(performance.now() - startedAt);
+	logger.info({ method: commonEvent.method, path: commonEvent.path, status: response.statusCode, ms }, "http");
+	return response;
+};
+
+/** Finds the route in root.yaml, runs its parser and handler, and maps errors to responses. */
+const route = async (commonEvent: CommonEvent): Promise<APIGatewayProxyStructuredResultV2> => {
 	try {
 		const routeConfig = getRouteConfig(commonEvent);
 
