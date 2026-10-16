@@ -12,3 +12,5 @@
 - **JWT in `localStorage`, sent as `Authorization: Bearer`.** An httpOnly cookie is safer, but would be overengineering here.
 - **`GET /auth/me` after a page reload.** The frontend keeps only the token; on start it asks
   the API who the user is, so an expired token is noticed right away.
+- **Vite proxies `/api` to the backend**, so the browser never makes cross-origin requests and
+  CORS does not come into play during development.

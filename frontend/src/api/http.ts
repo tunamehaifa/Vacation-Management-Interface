@@ -11,7 +11,8 @@ export const tokenStorage = {
 
 /** One Axios instance for the whole app: base URL, token, error handling. */
 export const http = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8888',
+  // Relative: the Vite dev server proxies /api to the backend (vite.config.ts).
+  baseURL: import.meta.env.VITE_API_URL || '/api',
   headers: { 'Content-Type': 'application/json' },
 })
 
@@ -43,7 +44,10 @@ http.interceptors.response.use(
 /** The API answers errors as { error: { code, message, details? } }. */
 export const errorMessage = (error: unknown, fallback = 'Something went wrong'): string => {
   if (axios.isAxiosError(error)) {
-    if (!error.response) return 'Cannot reach the server. Is the API running?'
+    // No response at all, or the dev proxy answering for an API that is down.
+    if (!error.response || [502, 503, 504].includes(error.response.status)) {
+      return 'Cannot reach the server. Is the API running?'
+    }
     const message = (error.response.data as { error?: { message?: string } })?.error?.message
     if (message) return message
   }
