@@ -8,6 +8,7 @@ import { CreateUsersTable1792108800000 } from "./migrations/1792108800000-Create
 import { CreateVacationRequestsTable1792108801000 } from "./migrations/1792108801000-CreateVacationRequestsTable";
 import { AddVacationRequestRules1792108802000 } from "./migrations/1792108802000-AddVacationRequestRules";
 import { AddVacationRequestIndexes1792108803000 } from "./migrations/1792108803000-AddVacationRequestIndexes";
+import { IndexPlannedVacationDates1792108804000 } from "./migrations/1792108804000-IndexPlannedVacationDates";
 
 // The API gets .env from the framework's loadEnv(); the TypeORM CLI and the
 // seed script import this file directly, so load it here as well.
@@ -37,6 +38,7 @@ export const AppDataSource = new DataSource({
 		CreateVacationRequestsTable1792108801000,
 		AddVacationRequestRules1792108802000,
 		AddVacationRequestIndexes1792108803000,
+		IndexPlannedVacationDates1792108804000,
 	],
 	synchronize: false,
 	logging: ["error"],
