@@ -13,7 +13,9 @@ JWT auth · pino logging · Vitest.
 
 ## Installation and running
 
-**You need** Node.js 22.18+ (or 24.12+) and Docker.
+**You need:**
+- **Node.js 22.22+ or 24.15+**, an LTS version (`.nvmrc` says 24, so `nvm use` picks it);
+- **Docker with Compose v2**, i.e. the `docker compose` command. Docker Desktop includes it.
 
 ### Quick start
 
@@ -44,7 +46,7 @@ user, password and database are all `vacation`.
 
 ```bash
 cd backend
-cp .env.example .env
+cp .env.example .env    # Windows cmd: copy .env.example .env
 npm install
 npm run migration:run   # creates the tables, constraints and indexes
 npm run seed            # demo users and 35 sample requests
@@ -63,11 +65,16 @@ Open http://localhost:5173 and sign in with a demo account.
 
 ### If something does not start
 
+- **`Cannot connect to the Docker daemon`:** Docker is not running. Start Docker Desktop and try again.
 - **Port 5433, 8888 or 5173 is already in use:** stop whatever uses it. If 5173 is taken, Vite picks
   the next free port and prints it.
 - **The app says "Cannot reach the server":** the API is not running. Start it with `npm run dev`,
   either from the root or from `backend`.
 - **Sign-in fails right after setup:** the seed has not run yet. Run `npm run seed` in `backend`.
+- **`npm install` prints `deprecated` warnings** (such as `aws-sdk` or `uuid`): they come from
+  the Common Event Framework's own dependencies and are harmless.
+- **`npm install` prints `EBADENGINE` warnings:** your Node.js version is older or newer than the
+  supported ones above. Switch to an LTS version (`nvm use`).
 
 ### Demo accounts
 
