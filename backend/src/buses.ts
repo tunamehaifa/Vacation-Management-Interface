@@ -23,6 +23,14 @@ import {
 	UpdateVacationRequestCommand,
 	UpdateVacationRequestHandler,
 } from "./vacation-requests/commands/update-vacation-request";
+import {
+	VacationRequestApprovedEvent,
+	VacationRequestCancelledEvent,
+	VacationRequestCreatedEvent,
+	VacationRequestRejectedEvent,
+	VacationRequestUpdatedEvent,
+} from "./vacation-requests/events";
+import { auditLog } from "./vacation-requests/subscribers/audit-log";
 
 /**
  * Composition root: the one place where buses are built, middlewares are
@@ -42,5 +50,11 @@ commandBus
 	.register(ApproveVacationRequestCommand, new ApproveVacationRequestHandler(eventBus))
 	.register(RejectVacationRequestCommand, new RejectVacationRequestHandler(eventBus));
 
-// Event subscribers are registered here, e.g. the request history (planned):
-//   eventBus.subscribe(VacationRequestApprovedEvent, recordHistory);
+// Every change of a request is written to the audit log. More reactions
+// (a history table, an email to the requester) would be more subscribers here.
+eventBus
+	.subscribe(VacationRequestCreatedEvent, auditLog)
+	.subscribe(VacationRequestUpdatedEvent, auditLog)
+	.subscribe(VacationRequestCancelledEvent, auditLog)
+	.subscribe(VacationRequestApprovedEvent, auditLog)
+	.subscribe(VacationRequestRejectedEvent, auditLog);

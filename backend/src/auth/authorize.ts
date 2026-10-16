@@ -4,6 +4,7 @@ import { UserRole } from "../entities/user.entity";
 import { ForbiddenError, UnauthorizedError } from "../http/errors";
 import { getHeader } from "../http/request";
 import { HandlerFn } from "../handlers/types";
+import { logger } from "../logger";
 import { AuthUser, verifyToken } from "./jwt";
 
 export type AuthorizedHandlerFn<TInput = any> = (
@@ -29,9 +30,17 @@ export const authorize =
 		const token = header?.match(/^Bearer\s+(\S+)$/i)?.[1];
 		if (!token) throw new UnauthorizedError();
 
+		// A missing token is routine (signed out); a bad one or a wrong role is worth a warning.
 		const user = verifyToken(token);
-		if (!user) throw new UnauthorizedError("Invalid or expired token");
-		if (!roles.includes(user.role)) throw new ForbiddenError();
+		if (!user) {
+			logger.warn({ auth: "token rejected", failure: "invalid or expired" }, "auth");
+			throw new UnauthorizedError("Invalid or expired token");
+		}
+		if (!roles.includes(user.role)) {
+			const failure = `needs ${roles.join(" or ")}`;
+			logger.warn({ auth: "forbidden", user: `${user.role}:${user.id}`, failure }, "auth");
+			throw new ForbiddenError();
+		}
 
 		return handler(input, event, user);
 	};

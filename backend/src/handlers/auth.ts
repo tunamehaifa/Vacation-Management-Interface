@@ -3,6 +3,7 @@ import { z } from "zod";
 import { ANY_ROLE, authorize } from "../auth/authorize";
 import * as authService from "../auth/auth.service";
 import { parseBody } from "../http/request";
+import { loggedQuery } from "./logged-query";
 import { HandlerFn, InputParserFn } from "./types";
 
 // --- POST /auth/login ---
@@ -23,5 +24,5 @@ export const login: HandlerFn = async (input: LoginInput) => {
 // --- GET /auth/me ---
 
 export const getMe = authorize(ANY_ROLE, async (_input, _event, user) => {
-	return authService.getUserById(user.id);
+	return loggedQuery("me", user, () => authService.getUserById(user.id));
 });

@@ -1,5 +1,6 @@
 import { QueryFailedError } from "typeorm";
 import { ConflictError, ValidationError } from "../http/errors";
+import { logger } from "../logger";
 
 /**
  * The rules are checked in code first, so a constraint violation only happens
@@ -19,6 +20,9 @@ export async function translateConstraintErrors<T>(work: () => Promise<T>): Prom
 	} catch (err) {
 		const constraint = err instanceof QueryFailedError ? (err.driverError as { constraint?: string }).constraint : undefined;
 		const translated = constraint ? byConstraint[constraint] : undefined;
-		throw translated ? translated() : err;
+		if (!translated) throw err;
+		// The check in code had passed, so this was a race that the database stopped.
+		logger.warn({ constraint }, "database constraint");
+		throw translated();
 	}
 }

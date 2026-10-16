@@ -13,6 +13,7 @@ import { CreateVacationRequestCommand } from "../vacation-requests/commands/crea
 import { RejectVacationRequestCommand } from "../vacation-requests/commands/reject-vacation-request";
 import { UpdateVacationRequestCommand } from "../vacation-requests/commands/update-vacation-request";
 import { getRequest, listAllRequests, listMyRequests } from "../vacation-requests/queries";
+import { loggedQuery } from "./logged-query";
 import { InputParserFn } from "./types";
 
 /**
@@ -96,7 +97,8 @@ export const parseMineInput: InputParserFn = (event) => parseQuery(event, pagina
 
 export const getMyRequests = authorize(
 	[UserRole.Requester],
-	async (input: z.infer<typeof paginationSchema>, _event, user) => listMyRequests(user.id, input),
+	async (input: z.infer<typeof paginationSchema>, _event, user) =>
+		loggedQuery("myRequests", user, () => listMyRequests(user.id, input)),
 );
 
 // --- GET /vacation-requests?status=&userId=&page=&limit= (Validator) ---
@@ -110,10 +112,12 @@ export const parseFilterInput: InputParserFn = (event) => parseQuery(event, filt
 
 export const getAllRequests = authorize(
 	[UserRole.Validator],
-	async ({ status, userId, page, limit }: z.infer<typeof filterSchema>) =>
-		listAllRequests({ status, userId }, { page, limit }),
+	async ({ status, userId, page, limit }: z.infer<typeof filterSchema>, _event, user) =>
+		loggedQuery("allRequests", user, () => listAllRequests({ status, userId }, { page, limit }), { status, userId }),
 );
 
 // --- GET /vacation-requests/:id (Validator) ---
 
-export const getRequestById = authorize([UserRole.Validator], async (input: { id: string }) => getRequest(input.id));
+export const getRequestById = authorize([UserRole.Validator], async (input: { id: string }, _event, user) =>
+	loggedQuery("oneRequest", user, () => getRequest(input.id), { id: input.id }),
+);

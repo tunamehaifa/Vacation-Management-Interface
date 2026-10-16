@@ -5,6 +5,7 @@ import { paginationSchema } from "../http/pagination";
 import { parseQuery } from "../http/request";
 import { listTeamVacations } from "../vacation-requests/queries";
 import { todayUtc } from "../vacation-requests/rules";
+import { loggedQuery } from "./logged-query";
 import { InputParserFn } from "./types";
 
 // --- GET /team/vacations?from=&to=&page=&limit= (both roles) ---
@@ -38,5 +39,5 @@ type TeamInput = { from: string; to: string; page: number; limit: number };
 export const getTeamVacations = authorize(ANY_ROLE, async ({ from, to, page, limit }: TeamInput, _event, user) => ({
 	from,
 	to,
-	...(await listTeamVacations(from, to, user, { page, limit })),
+	...(await loggedQuery("teamVacations", user, () => listTeamVacations(from, to, user, { page, limit }), { from, to })),
 }));
