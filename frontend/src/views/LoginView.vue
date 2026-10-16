@@ -21,8 +21,10 @@ async function submit() {
   submitting.value = true
   try {
     await auth.login(email.value, password.value)
-    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/'
-    await router.replace(redirect)
+    // Only paths inside the app: "//other.site" or a full URL falls back to the home page.
+    const redirect = route.query.redirect
+    const safe = typeof redirect === 'string' && redirect.startsWith('/') && !redirect.startsWith('//')
+    await router.replace(safe ? redirect : '/')
   } catch (err) {
     error.value = errorMessage(err, 'Could not sign in')
   } finally {

@@ -86,6 +86,14 @@ Authorization: Bearer {{validatorToken}}
 GET {{baseUrl}}/vacation-requests?status=Pending
 Authorization: Bearer {{validatorToken}}
 
+### Pagination: second page of 5 (the response has total and totalPages)
+GET {{baseUrl}}/vacation-requests?status=Pending&page=2&limit=5
+Authorization: Bearer {{validatorToken}}
+
+### One request, with its user
+GET {{baseUrl}}/vacation-requests/{{requestId}}
+Authorization: Bearer {{validatorToken}}
+
 ### Filter by user (Alice)
 GET {{baseUrl}}/vacation-requests?userId={{loginRequester.response.body.user.id}}
 Authorization: Bearer {{validatorToken}}

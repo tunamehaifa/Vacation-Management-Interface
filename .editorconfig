@@ -7,3 +7,7 @@ indent_style = space
 indent_size = 2
 insert_final_newline = true
 trim_trailing_whitespace = true
+
+# The backend keeps the tabs of the Common Event Framework template.
+[backend/**.ts]
+indent_style = tab
