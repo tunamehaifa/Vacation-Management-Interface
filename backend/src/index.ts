@@ -16,6 +16,7 @@ import {
 } from "commoneventframework";
 import { CommonEvent, LambdaEvent } from "commoneventframework/dist/types/commonEvent";
 import { HandlerFn, InputParserFn } from "./handlers/types";
+import { NotFoundError, toErrorResponse } from "./http/errors";
 
 export const handler = async (
 	event: LambdaEvent,
@@ -29,7 +30,7 @@ export const handler = async (
 		const routeConfig = getRouteConfig(commonEvent);
 
 		if (!routeConfig || !routeConfig.handler) {
-			return new Response(404, { error: "Route not found" });
+			throw new NotFoundError("Route not found");
 		}
 
 		const handlerFn = resolveHandlerRef(routeConfig.handler) as HandlerFn | undefined;
@@ -38,7 +39,7 @@ export const handler = async (
 			: undefined;
 
 		if (!handlerFn) {
-			return new Response(500, { error: `Handler "${routeConfig.handler}" not found` });
+			throw new Error(`Handler "${routeConfig.handler}" not found`);
 		}
 
 		const input = parserFn ? parserFn(commonEvent) : {};
@@ -51,8 +52,8 @@ export const handler = async (
 		}
 		return new Response(200, result as object);
 	} catch (err) {
-		console.error('handler error', err);
-		return new Response(500, err as object);
+		// Parsers and handlers throw AppErrors (400/401/403/404/409); anything else becomes a 500.
+		return toErrorResponse(err);
 	}
 };
 

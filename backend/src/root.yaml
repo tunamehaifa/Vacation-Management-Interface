@@ -2,6 +2,18 @@ openapi: 3.0.3
 info:
   title: Vacation Management API
   version: 0.1.0
+  description: >
+    Protected routes need `Authorization: Bearer <token>` from POST /auth/login.
+    Roles are enforced in code by `authorize([...roles], handler)`; `security`
+    below only documents which routes need a token.
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
 paths:
   /health:
     get:
@@ -10,3 +22,38 @@ paths:
       responses:
         '200':
           description: Service is up
+
+  /auth/login:
+    post:
+      x-handler: handlers/auth#login
+      x-inputParser: handlers/auth#parseLoginInput
+      summary: Sign in with email and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+      responses:
+        '200':
+          description: "Signed in: { token, user }"
+        '400':
+          description: Invalid request body
+        '401':
+          description: Invalid email or password
+
+  /auth/me:
+    get:
+      x-handler: handlers/auth#getMe
+      summary: The signed-in user (used to restore a session)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: "{ id, name, email, role }"
+        '401':
+          description: Missing, invalid or expired token

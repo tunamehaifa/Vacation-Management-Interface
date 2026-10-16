@@ -1,0 +1,79 @@
+# Requests for the VS Code "REST Client" extension (humao.rest-client).
+# Start the API first: `npm run dev` in backend/. Click "Send Request" above each block.
+# Send both login requests first: the requests below reuse their tokens.
+
+@baseUrl = http://localhost:8888
+@password = Password123!
+# Filled from the login responses below (send those first):
+@requesterToken = {{loginRequester.response.body.token}}
+@validatorToken = {{loginValidator.response.body.token}}
+
+### Health check
+GET {{baseUrl}}/health
+
+### Login as a requester (Alice)
+# @name loginRequester
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "alice@example.com",
+  "password": "{{password}}"
+}
+
+### Login as the validator
+# @name loginValidator
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "validator@example.com",
+  "password": "{{password}}"
+}
+
+### Current user — requester (what the frontend calls after a page reload)
+GET {{baseUrl}}/auth/me
+Authorization: Bearer {{requesterToken}}
+
+### Current user — validator
+GET {{baseUrl}}/auth/me
+Authorization: Bearer {{validatorToken}}
+
+
+### --- Error cases ---
+
+### 401: wrong password
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "alice@example.com",
+  "password": "wrong"
+}
+
+### 401: unknown email — same answer as a wrong password
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "nobody@example.com",
+  "password": "wrong"
+}
+
+### 400: invalid body (bad email, missing password)
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "not-an-email"
+}
+
+### 401: no token
+GET {{baseUrl}}/auth/me
+
+### 401: forged token
+GET {{baseUrl}}/auth/me
+Authorization: Bearer not.a.real.token
+
+### 404: unknown route
+GET {{baseUrl}}/does-not-exist
